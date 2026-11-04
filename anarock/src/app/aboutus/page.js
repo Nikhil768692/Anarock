@@ -110,7 +110,7 @@ const companyJourney = [
         detail: (
             <>
                 <strong>Acquisition</strong> of ANACITY, a community
-                management application. <strong>Launched</strong> 'Astra',
+                                management application. <strong>Launched</strong> &apos;Astra&apos;,
                 an AI/ML tool to boost sales.
             </>
         ),
