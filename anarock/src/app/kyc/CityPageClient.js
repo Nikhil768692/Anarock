@@ -1,73 +1,251 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PropertyCard from "@/components/properties/PropertyCard";
+import { usePreferences } from "@/lib/preferences";
+import { convertArea, convertCurrency } from "@/lib/format";
 import {
   ArrowRight,
   Building2,
+  Check,
   GitCompare,
+  Lightbulb,
+  Loader2,
   X,
 } from "lucide-react";
+
 const COMPARE_STORAGE_KEY = "anarock_compare_properties";
 const MAX_COMPARE_PROPERTIES = 3;
 const MIN_COMPARE_PROPERTIES = 2;
+const PROPERTIES_TO_SHOW = 8;
+const MICROMARKETS_TO_SHOW = 6;
+
+const NAVY = "#1C2340";
+const PURPLE = "#7B2F77";
+
+/* ------------------------------------------------------------------ */
+/* Static copy                                                        */
+/* ------------------------------------------------------------------ */
+
+const HERO_TITLE = "Find your next office in India’s office capital";
+
+const ADVISOR_BLURB =
+  "Get an off-market shortlist and rental benchmarks for your requirement, at no cost to occupiers.";
+
+const INSIGHT = {
+  title:
+    "[X]% of new Grade A space on ORR was pre-committed before completion in 2026.",
+  body: "The best floors often never reach a listing. Our advisors track buildings [X] months before they open.",
+  cta: "Ask what’s coming up",
+};
+
+const ADVISOR_CALLBACK_HOURS = "[X]";
+
+const FORM_BENEFITS = [
+  "Off-market and pre-lease options",
+  "Rental benchmarks from ANAROCK Research",
+  "Negotiation and term-sheet support",
+];
+
+// Size ranges are stored in sq ft and shown in the user's selected unit.
+const SIZE_RANGES_SQFT = [
+  [null, 5000],
+  [5000, 20000],
+  [20000, 50000],
+  [50000, 100000],
+  [100000, null],
+];
+
+const CURRENCY_SYMBOLS = {
+  INR: "₹",
+  AED: "د.إ ",
+  USD: "$",
+  EUR: "€",
+  SGD: "S$",
+  GBP: "£",
+};
+
+const TIMELINE_OPTIONS = [
+  "Immediately",
+  "Within 3 months",
+  "3 – 6 months",
+  "6 – 12 months",
+  "More than 12 months",
+];
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
 function getPropertyId(property) {
   return String(property?.id || "").trim();
 }
-function isFeaturedProperty(property) {
-  const featured = property?.Featured ?? property?.featured;
-  return (featured === true || String(featured).trim().toLowerCase() === "true"
-  );
+
+function toUrlValue(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[\/\\]+/g, "-")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
-export default function CityPageClient({ city, slug }) {
+function getInitials(name) {
+  return String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+}
+
+function formatNumber(value, maximumFractionDigits = 1) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return value.toLocaleString("en-IN", { maximumFractionDigits });
+}
+
+function getUnitLabel(unit) {
+  return unit === "sqm" ? "sq m" : "sq ft";
+}
+
+function formatAreaValue(areaSqft, unit) {
+  const value = Math.round(convertArea(areaSqft, "sqft", unit));
+  return value.toLocaleString(unit === "sqm" ? "en-US" : "en-IN");
+}
+
+function getSizeOptions(unit) {
+  const label = getUnitLabel(unit);
+
+  return SIZE_RANGES_SQFT.map(([min, max]) => {
+    if (min === null) return `Up to ${formatAreaValue(max, unit)} ${label}`;
+    if (max === null) return `${formatAreaValue(min, unit)}+ ${label}`;
+    return `${formatAreaValue(min, unit)} – ${formatAreaValue(max, unit)} ${label}`;
+  });
+}
+
+// Rent is stored in INR per sq ft per month.
+function formatRent(rentInrPerSqft, currency, unit, exchangeRates) {
+  if (!Number.isFinite(rentInrPerSqft)) return "—";
+
+  const perUnit =
+    unit === "sqm" ? rentInrPerSqft / convertArea(1, "sqft", "sqm") : rentInrPerSqft;
+  const converted = convertCurrency(perUnit, "INR", currency, exchangeRates);
+  const code = String(currency || "INR").toUpperCase();
+  const symbol = CURRENCY_SYMBOLS[code] ?? `${code} `;
+  const digits = code === "INR" ? 1 : 2;
+
+  return `${symbol}${converted.toLocaleString(code === "INR" ? "en-IN" : "en-US", {
+    maximumFractionDigits: digits,
+  })}`;
+}
+
+// Absorption and supply are stored in million sq ft.
+function formatMillionArea(valueMnSqft, unit) {
+  if (!Number.isFinite(valueMnSqft)) return "—";
+  return `${formatNumber(convertArea(valueMnSqft, "sqft", unit), unit === "sqm" ? 2 : 1)} mn`;
+}
+
+function getQuarterPrefix(quarterLabel) {
+  const match = String(quarterLabel || "").match(/Q[1-4]/i);
+  return match ? match[0].toUpperCase() : "";
+}
+
+function getStoredUserLocation() {
+  try {
+    const saved = sessionStorage.getItem("anarock_user_location");
+    return saved ? JSON.parse(saved) || {} : {};
+  } catch {
+    return {};
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                               */
+/* ------------------------------------------------------------------ */
+
+export default function CityPageClient({ city }) {
   const router = useRouter();
+  const { currency, unit, exchangeRates } = usePreferences();
   const [compareSelection, setCompareSelection] = useState([]);
   const [allProperties, setAllProperties] = useState([]);
-  const [properties, setProperties] = useState([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
   const [propertyError, setPropertyError] = useState("");
+  const [cityData, setCityData] = useState({ advisor: null, market: null });
+  const [loadingCityData, setLoadingCityData] = useState(true);
+
+  const citySlug = toUrlValue(city);
+  const allPropertiesUrl = `/properties?city=${encodeURIComponent(citySlug)}`;
+
   useEffect(() => {
     let cancelled = false;
+
     async function loadProperties() {
       try {
         setLoadingProperties(true);
         setPropertyError("");
-        const response = await fetch(`/api/properties?city=${encodeURIComponent(city)}`,
-          {
-            method: "GET",
-            cache: "no-store",
-          }
+        const response = await fetch(
+          `/api/properties?city=${encodeURIComponent(city)}`,
+          { method: "GET", cache: "no-store" },
         );
         const json = await response.json();
         if (cancelled) return;
         if (!response.ok || !json?.success) {
-          throw new Error(
-            json?.error || "Unable to load properties."
-          );
+          throw new Error(json?.error || "Unable to load properties.");
         }
-        const propertyData = Array.isArray(json?.data)
-          ? json.data
-          : [];
-        setAllProperties(propertyData);
-        setProperties(propertyData.filter(isFeaturedProperty));
+        setAllProperties(Array.isArray(json?.data) ? json.data : []);
       } catch (error) {
         if (cancelled) return;
         console.error("[CityPage] Properties error:", error);
         setPropertyError(error?.message || "Unable to load properties.");
       } finally {
-        if (!cancelled) {
-          setLoadingProperties(false);
-        }
+        if (!cancelled) setLoadingProperties(false);
       }
     }
+
     loadProperties();
     return () => {
       cancelled = true;
     };
   }, [city]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCityData() {
+      try {
+        setLoadingCityData(true);
+        const response = await fetch(
+          `/api/city-page?city=${encodeURIComponent(city)}`,
+          { method: "GET", cache: "no-store" },
+        );
+        const json = await response.json();
+        if (cancelled) return;
+        if (response.ok && json?.success) {
+          setCityData({
+            advisor: json.advisor || null,
+            market: json.market || null,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) console.error("[CityPage] City data error:", error);
+      } finally {
+        if (!cancelled) setLoadingCityData(false);
+      }
+    }
+
+    loadCityData();
+    return () => {
+      cancelled = true;
+    };
+  }, [city]);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem(COMPARE_STORAGE_KEY);
@@ -82,60 +260,71 @@ export default function CityPageClient({ city, slug }) {
       }
       const validSelection = parsed
         .filter((item) => getPropertyId(item))
-        .filter((item, index, array) =>
-          index === array.findIndex((candidate) => getPropertyId(candidate) === getPropertyId(item)))
+        .filter(
+          (item, index, array) =>
+            index ===
+            array.findIndex(
+              (candidate) => getPropertyId(candidate) === getPropertyId(item),
+            ),
+        )
         .slice(0, MAX_COMPARE_PROPERTIES);
       setCompareSelection(validSelection);
     } catch (error) {
-      console.error("[CityPage] Failed to restore compare selection:",
-        error);
+      console.error("[CityPage] Failed to restore compare selection:", error);
       setCompareSelection([]);
     }
   }, []);
 
+  const visibleProperties = allProperties.slice(0, PROPERTIES_TO_SHOW);
+
+  const micromarkets = useMemo(() => {
+    const counts = new Map();
+
+    for (const property of allProperties) {
+      const name = String(property?.micromarket || "").trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      const current = counts.get(key);
+      counts.set(key, {
+        name: current?.name || name,
+        count: (current?.count || 0) + 1,
+      });
+    }
+
+    return [...counts.values()]
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, MICROMARKETS_TO_SHOW);
+  }, [allProperties]);
+
   const handleCompareToggle = (property) => {
     const propertyId = getPropertyId(property);
-
-    if (!propertyId) {
-      console.warn(
-        "[CityPage] Property has no valid ID:",
-        property
-      );
-      return;
-    }
+    if (!propertyId) return;
 
     setCompareSelection((currentSelection) => {
       const exists = currentSelection.some(
-        (item) => getPropertyId(item) === propertyId
+        (item) => getPropertyId(item) === propertyId,
       );
 
       let updatedSelection;
 
       if (exists) {
         updatedSelection = currentSelection.filter(
-          (item) => getPropertyId(item) !== propertyId
+          (item) => getPropertyId(item) !== propertyId,
         );
       } else {
         if (currentSelection.length >= MAX_COMPARE_PROPERTIES) {
-          alert(
-            `You can compare a maximum of ${MAX_COMPARE_PROPERTIES} properties.`
-          );
           return currentSelection;
         }
-
         updatedSelection = [...currentSelection, property];
       }
 
       try {
         localStorage.setItem(
           COMPARE_STORAGE_KEY,
-          JSON.stringify(updatedSelection)
+          JSON.stringify(updatedSelection),
         );
       } catch (error) {
-        console.error(
-          "[CityPage] Failed to save compare selection:",
-          error
-        );
+        console.error("[CityPage] Failed to save compare selection:", error);
       }
 
       return updatedSelection;
@@ -144,14 +333,10 @@ export default function CityPageClient({ city, slug }) {
 
   const clearCompareSelection = () => {
     setCompareSelection([]);
-
     try {
       localStorage.removeItem(COMPARE_STORAGE_KEY);
     } catch (error) {
-      console.error(
-        "[CityPage] Failed to clear compare selection:",
-        error
-      );
+      console.error("[CityPage] Failed to clear compare selection:", error);
     }
   };
 
@@ -162,157 +347,174 @@ export default function CityPageClient({ city, slug }) {
     ) {
       return;
     }
-
     try {
       localStorage.setItem(
         COMPARE_STORAGE_KEY,
-        JSON.stringify(compareSelection)
+        JSON.stringify(compareSelection),
       );
     } catch (error) {
-      console.error(
-        "[CityPage] Failed to save compare selection:",
-        error
-      );
+      console.error("[CityPage] Failed to save compare selection:", error);
       return;
     }
-
     router.push("/compare");
   };
 
+  const scrollToRequirementForm = () => {
+    document
+      .getElementById("city-requirement")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const totalProperties = allProperties.length;
+  const countLabel = loadingProperties
+    ? "…"
+    : totalProperties.toLocaleString("en-IN");
+
   return (
-    <main className="min-w-0 w-full bg-[#F8F9FB] text-[#172033]">
-      <div className="grid w-full min-w-0 grid-cols-1">
-        {/* LEFT: CITY AND PROPERTIES */}
-        <section className="min-w-0">
-          <Breadcrumbs
-            items={[
-              {
-                label: "Popular Cities",
-                href: "/#popularCities",
-              },
-              { label: city },
-            ]}
-          />
+    <main className="w-full min-w-0 bg-[#F6F6F8] text-[#1C2340]">
+      <Breadcrumbs
+        items={[
+          { label: "Popular Cities", href: "/#popularCities" },
+          { label: city },
+        ]}
+      />
 
-          {/* CITY HEADER */}
-          <header className="border-b border-[#E5E7EB] bg-white">
-            <div className="px-4 py-7 sm:px-6 sm:py-8 lg:px-10 2xl:px-12">
-              <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                <div className="min-w-0">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#A054A0]">
-                    Explore Commercial Real Estate
-                  </p>
-
-                  <h1 className="break-words text-2xl font-semibold leading-tight tracking-[-0.035em] text-[#15233C] sm:text-3xl lg:text-4xl">
-                    {city}
-                  </h1>
-                </div>
-
-                {/* COUNT ALL PROPERTIES, NOT JUST FEATURED */}
-                <div className="inline-flex w-fit max-w-full shrink-0 items-center gap-2.5 rounded-xl border border-[#E5E7EB] bg-[#FAFAFC] px-4 py-3">
-                  <Building2
-                    size={18}
-                    strokeWidth={1.8}
-                    className="shrink-0 text-[#A054A0]"
-                  />
-
-                  <span className="text-sm font-semibold tabular-nums text-[#15233C]">
-                    {loadingProperties
-                      ? "Loading..."
-                      : `${allProperties.length} Properties`}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </header>
-
-          {/* FEATURED PROPERTIES GRID */}
-          <div className="min-w-0 bg-[#F8F9FB]">
-            <div className="px-4 py-7 sm:px-6 sm:py-9 lg:px-10 2xl:px-12">
-              {loadingProperties ? (
-                <PropertyGridSkeleton />
-              ) : propertyError ? (
-                <div
-                  role="alert"
-                  className="rounded-2xl border border-red-200 bg-white p-5 text-sm leading-6 text-red-600 shadow-sm"
-                >
-                  <p className="font-semibold">
-                    Unable to load properties
-                  </p>
-                  <p className="mt-1">{propertyError}</p>
-                </div>
-              ) : properties.length === 0 ? (
-                <EmptyProperties city={city} />
-              ) : (
-                <>
-                  <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2 lg:gap-6 xl:grid-cols-3">
-                    {properties.slice(0, 8).map((property, index) => (
-                      <div
-                        key={getPropertyId(property) || index}
-                        className="min-w-0"
-                      >
-                        <PropertyCard
-                          property={property}
-                          isCompared={compareSelection.some(
-                            (item) =>
-                              getPropertyId(item) ===
-                              getPropertyId(property)
-                          )}
-                          onCompareToggle={() =>
-                            handleCompareToggle(property)
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex justify-center pt-9 sm:pt-11">
-                    <Link
-                      href={`/properties?city=${encodeURIComponent(city)}`}
-                      className="
-                        group inline-flex min-h-12 max-w-full
-                        items-center justify-center gap-3
-                        rounded-xl bg-[#A054A0] px-5 py-3.5
-                        text-center text-sm font-semibold text-white
-                        shadow-[0_5px_16px_rgba(160,84,160,0.16)]
-                        transition-all duration-200
-                        hover:-translate-y-0.5 hover:bg-[#813C81]
-                        hover:shadow-[0_8px_22px_rgba(160,84,160,0.22)]
-                        focus-visible:outline-none focus-visible:ring-2
-                        focus-visible:ring-[#A054A0] focus-visible:ring-offset-2
-                        sm:px-7
-                      "
-                    >
-                      <span className="break-words">
-                        View All Properties in {city}
-                      </span>
-
-                      <ArrowRight
-                        size={17}
-                        className="shrink-0 transition-transform duration-200 group-hover:translate-x-1"
-                      />
-                    </Link>
-                  </div>
-                </>
-              )}
-            </div>
+      {/* HERO + ADVISOR */}
+      <section className="mx-auto w-full max-w-[1280px] px-4 pb-12 pt-4 sm:px-6 sm:pb-14 lg:px-10 lg:pb-16">
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12">
+          <div className="min-w-0 pt-2 lg:pt-6">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#A054A0] sm:text-xs">
+              Commercial office space · {city}
+            </p>
+            <h1 className="mt-4 max-w-[640px] text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-[#1C2340] sm:text-[42px] lg:text-[48px]">
+              {HERO_TITLE}
+            </h1>
+            <p className="mt-5 max-w-[560px] text-[15px] leading-7 text-[#4B5268] sm:text-base">
+              {countLabel} verified Grade A buildings across {city}’s key
+              micro-markets, with live rentals from ANAROCK Research and
+              advisors who close deals here every week.
+            </p>
           </div>
-        </section>
-      </div>
+
+          <AdvisorCard
+            city={city}
+            advisor={cityData.advisor}
+            loading={loadingCityData}
+          />
+        </div>
+      </section>
+
+      {/* MARKET AT A GLANCE */}
+      <MarketSection
+        city={city}
+        market={cityData.market}
+        loading={loadingCityData}
+        currency={currency}
+        unit={unit}
+        exchangeRates={exchangeRates}
+      />
+
+      {/* EXPLORE BY MICRO-MARKET */}
+      <section className="mx-auto w-full max-w-[1280px] px-4 pt-12 sm:px-6 sm:pt-14 lg:px-10 lg:pt-16">
+        <h2 className="text-[24px] font-bold tracking-[-0.01em] text-[#1C2340] sm:text-[28px]">
+          Explore by micro-market
+        </h2>
+        <p className="mt-1.5 text-sm text-[#4B5268]">
+          Each area has its own rent band, tenant mix and supply pipeline.
+        </p>
+
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+          {loadingProperties
+            ? Array.from({ length: MICROMARKETS_TO_SHOW }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-[118px] animate-pulse rounded-xl border border-[#E7E7EE] bg-white"
+                />
+              ))
+            : micromarkets.map((market) => (
+                <Link
+                  key={market.name}
+                  href={`${allPropertiesUrl}&micromarket=${encodeURIComponent(toUrlValue(market.name))}`}
+                  className="group flex min-w-0 flex-col rounded-xl border border-[#E7E7EE] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#A054A0]/50 hover:shadow-md"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#F4EAF2] text-[#A054A0]">
+                    <Building2 className="h-4 w-4" strokeWidth={1.8} />
+                  </span>
+                  <span className="mt-3 truncate text-sm font-bold text-[#1C2340]">
+                    {market.name}
+                  </span>
+                  <span className="mt-2 text-xs font-semibold text-[#7B2F77] group-hover:underline">
+                    {market.count}{" "}
+                    {market.count === 1 ? "property" : "properties"} →
+                  </span>
+                </Link>
+              ))}
+        </div>
+      </section>
+
+      {/* OFFICE SPACES */}
+      <section className="mx-auto w-full max-w-[1280px] px-4 pt-12 sm:px-6 sm:pt-14 lg:px-10 lg:pt-16">
+        <h2 className="text-[24px] font-bold tracking-[-0.01em] text-[#1C2340] sm:text-[28px]">
+          {countLabel} office spaces available
+        </h2>
+
+        <div className="mt-6">
+          {loadingProperties ? (
+            <PropertyGridSkeleton />
+          ) : propertyError ? (
+            <div
+              role="alert"
+              className="rounded-2xl border border-red-200 bg-white p-5 text-sm leading-6 text-red-600 shadow-sm"
+            >
+              <p className="font-semibold">Unable to load properties</p>
+              <p className="mt-1">{propertyError}</p>
+            </div>
+          ) : visibleProperties.length === 0 ? (
+            <EmptyProperties city={city} />
+          ) : (
+            <>
+              <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+                {visibleProperties.map((property, index) => (
+                  <PropertyGridItem
+                    key={getPropertyId(property) || index}
+                    index={index}
+                    property={property}
+                    isCompared={compareSelection.some(
+                      (item) => getPropertyId(item) === getPropertyId(property),
+                    )}
+                    onCompareToggle={() => handleCompareToggle(property)}
+                    onInsightClick={scrollToRequirementForm}
+                  />
+                ))}
+              </div>
+
+              {totalProperties > visibleProperties.length && (
+                <div className="flex justify-center pt-8 sm:pt-10">
+                  <Link
+                    href={allPropertiesUrl}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#1C2340]/70 bg-white px-6 text-sm font-semibold text-[#1C2340] transition hover:border-[#7B2F77] hover:text-[#7B2F77]"
+                  >
+                    Show all {countLabel} properties
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* REQUIREMENT FORM */}
+      <section
+        id="city-requirement"
+        className="mx-auto w-full max-w-[1280px] scroll-mt-28 px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-14 lg:px-10 lg:pb-24 lg:pt-16"
+      >
+        <RequirementForm city={city} micromarkets={micromarkets} unit={unit} />
+      </section>
 
       {/* FLOATING COMPARE BAR */}
       {compareSelection.length > 0 && (
-        <div
-          className="
-            fixed bottom-4 left-1/2 z-[40]
-            w-[calc(100%-1.5rem)] max-w-3xl
-            -translate-x-1/2 rounded-2xl
-            border border-[#E5E7EB] bg-white/95 p-4
-            shadow-[0_12px_40px_rgba(21,35,60,0.14)]
-            backdrop-blur-xl
-            sm:bottom-6 sm:w-[calc(100%-2rem)] sm:p-5
-          "
-        >
+        <div className="fixed bottom-4 left-1/2 z-[40] w-[calc(100%-1.5rem)] max-w-3xl -translate-x-1/2 rounded-2xl border border-[#E5E7EB] bg-white/95 p-4 shadow-[0_12px_40px_rgba(21,35,60,0.14)] backdrop-blur-xl sm:bottom-6 sm:w-[calc(100%-2rem)] sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F8EFF8]">
@@ -321,16 +523,12 @@ export default function CityPageClient({ city, slug }) {
                   strokeWidth={1.8}
                 />
               </div>
-
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-[#15233C]">
                   {compareSelection.length}{" "}
-                  {compareSelection.length === 1
-                    ? "property"
-                    : "properties"}{" "}
+                  {compareSelection.length === 1 ? "property" : "properties"}{" "}
                   selected
                 </p>
-
                 <p className="mt-1 text-xs leading-5 text-[#647084]">
                   Select 2 or 3 properties to compare.
                 </p>
@@ -341,39 +539,16 @@ export default function CityPageClient({ city, slug }) {
               <button
                 type="button"
                 onClick={clearCompareSelection}
-                className="
-                  inline-flex min-h-11 flex-1 items-center
-                  justify-center gap-2 rounded-xl
-                  border border-[#E5E7EB] bg-white px-4
-                  text-sm font-medium text-[#475467]
-                  transition-colors duration-200
-                  hover:border-[#D1D5DB] hover:bg-[#F8F9FB]
-                  focus-visible:outline-none focus-visible:ring-2
-                  focus-visible:ring-[#A054A0] focus-visible:ring-offset-2
-                  sm:flex-none
-                "
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-sm font-medium text-[#475467] transition-colors duration-200 hover:border-[#D1D5DB] hover:bg-[#F8F9FB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A054A0] focus-visible:ring-offset-2 sm:flex-none"
               >
                 <X size={16} />
                 Clear
               </button>
-
               <button
                 type="button"
                 onClick={openComparePage}
-                disabled={
-                  compareSelection.length < MIN_COMPARE_PROPERTIES
-                }
-                className="
-                  inline-flex min-h-11 flex-1 items-center
-                  justify-center gap-2 rounded-xl
-                  bg-[#15233C] px-4 text-sm font-semibold
-                  text-white transition-colors duration-200
-                  hover:bg-[#A054A0]
-                  disabled:cursor-not-allowed disabled:opacity-40
-                  focus-visible:outline-none focus-visible:ring-2
-                  focus-visible:ring-[#A054A0] focus-visible:ring-offset-2
-                  sm:flex-none sm:px-5
-                "
+                disabled={compareSelection.length < MIN_COMPARE_PROPERTIES}
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#15233C] px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#A054A0] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A054A0] focus-visible:ring-offset-2 sm:flex-none sm:px-5"
               >
                 <GitCompare size={16} />
                 Compare ({compareSelection.length})
@@ -386,6 +561,509 @@ export default function CityPageClient({ city, slug }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Sections                                                           */
+/* ------------------------------------------------------------------ */
+
+function AdvisorCard({ city, advisor, loading }) {
+  if (loading) {
+    return (
+      <div className="w-full animate-pulse rounded-2xl border border-[#E7E7EE] bg-white p-6 shadow-sm">
+        <div className="h-3 w-40 rounded bg-[#EEE7EE]" />
+        <div className="mt-5 flex items-center gap-3">
+          <div className="h-12 w-12 rounded-full bg-[#EFE3ED]" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-2/3 rounded bg-[#EEF0F4]" />
+            <div className="h-3 w-full rounded bg-[#EEF0F4]" />
+          </div>
+        </div>
+        <div className="mt-5 h-12 rounded bg-[#EEF0F4]" />
+      </div>
+    );
+  }
+
+  if (!advisor) return null;
+
+  const subtitle = [
+    advisor.designation,
+    Number.isFinite(advisor.experienceYears)
+      ? `${advisor.experienceYears} yrs in ${city}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <aside className="w-full rounded-2xl border border-[#E7E7EE] bg-white p-6 shadow-[0_6px_24px_rgba(28,35,64,0.06)]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B2F77]">
+        Your {city} advisor
+      </p>
+
+      <div className="mt-4 flex items-center gap-3">
+        {advisor.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={advisor.photoUrl}
+            alt={advisor.name}
+            className="h-12 w-12 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#EFE3ED] text-base font-bold text-[#7B2F77]">
+            {getInitials(advisor.name)}
+          </span>
+        )}
+        <div className="min-w-0">
+          <p className="truncate text-[15px] font-bold text-[#1C2340]">
+            {advisor.name}
+          </p>
+          {subtitle && (
+            <p className="mt-0.5 text-xs leading-5 text-[#5B6175]">
+              {subtitle}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <p className="mt-4 text-sm leading-6 text-[#4B5268]">{ADVISOR_BLURB}</p>
+    </aside>
+  );
+}
+
+function MarketSection({
+  city,
+  market,
+  loading,
+  currency,
+  unit,
+  exchangeRates,
+}) {
+  const unitLabel = getUnitLabel(unit);
+  const quarter = market?.quarterLabel || "";
+  const quarterPrefix = getQuarterPrefix(quarter);
+  const change = market?.vacancyChangePts;
+  const hasChange = Number.isFinite(change);
+
+  const stats = [
+    {
+      label: "Average rental",
+      value: formatRent(market?.averageRent, currency, unit, exchangeRates),
+      note: `per ${unitLabel} / month`,
+    },
+    {
+      label: "Vacancy",
+      value: Number.isFinite(market?.vacancyPercent)
+        ? `${formatNumber(market.vacancyPercent)}%`
+        : "—",
+      note: hasChange
+        ? `${change > 0 ? "▲" : change < 0 ? "▼" : "•"} ${formatNumber(Math.abs(change))} pts vs last quarter`
+        : "",
+    },
+    {
+      label: `${quarterPrefix ? `${quarterPrefix} ` : ""}absorption`,
+      value: formatMillionArea(market?.absorptionMnSqft, unit),
+      note: `${unitLabel} leased`,
+    },
+    {
+      label: "New supply, next 12 mo",
+      value: formatMillionArea(market?.newSupplyMnSqft, unit),
+      note: `${unitLabel} completing`,
+    },
+    {
+      label: "Most active micro-market",
+      value: market?.mostActiveMicromarket || "—",
+      note: quarterPrefix ? `by ${quarterPrefix} leasing` : "",
+    },
+  ];
+
+  return (
+    <section style={{ backgroundColor: NAVY }} className="w-full text-white">
+      <div className="mx-auto w-full max-w-[1280px] px-4 py-10 sm:px-6 sm:py-12 lg:px-10 lg:py-14">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#D7B6D6] sm:text-xs">
+          {city} office market{quarter ? ` · ${quarter}` : ""}
+        </p>
+        <h2 className="mt-2 text-[22px] font-bold sm:text-[26px]">
+          The market at a glance
+        </h2>
+
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="min-w-0 rounded-xl border border-white/10 bg-[#29304C] p-4 sm:p-5"
+            >
+              <p className="text-xs text-white/75">{stat.label}</p>
+              {loading ? (
+                <div className="mt-2 h-8 w-20 animate-pulse rounded bg-white/10" />
+              ) : (
+                <p className="mt-1.5 truncate text-[24px] font-bold leading-tight sm:text-[28px]">
+                  {stat.value}
+                </p>
+              )}
+              {stat.note && (
+                <p className="mt-1 text-[11px] leading-4 text-white/70">
+                  {stat.note}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PropertyGridItem({
+  index,
+  property,
+  isCompared,
+  onCompareToggle,
+  onInsightClick,
+}) {
+  return (
+    <>
+      {index === 3 && <InsightCard onClick={onInsightClick} />}
+      <div className="min-w-0">
+        <PropertyCard
+          property={property}
+          isCompared={isCompared}
+          onCompareToggle={onCompareToggle}
+        />
+      </div>
+    </>
+  );
+}
+
+function InsightCard({ onClick }) {
+  return (
+    <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-[#E8D9E6] bg-[#F4EAF2] p-6 sm:p-7">
+      <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B2F77]">
+        <Lightbulb className="h-4 w-4" strokeWidth={1.8} />
+        Did you know?
+      </p>
+      <p className="mt-3 text-[20px] font-bold leading-snug text-[#1C2340] sm:text-[22px]">
+        {INSIGHT.title}
+      </p>
+      <p className="mt-3 text-sm leading-6 text-[#4B5268]">{INSIGHT.body}</p>
+      <div>
+        <button
+          type="button"
+          onClick={onClick}
+          style={{ backgroundColor: NAVY }}
+          className="mt-5 inline-flex min-h-10 items-center rounded-md px-4 text-sm font-semibold text-white transition hover:opacity-90"
+        >
+          {INSIGHT.cta}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const EMPTY_FORM = {
+  name: "",
+  company: "",
+  email: "",
+  size: "",
+  micromarket: "",
+  timeline: "",
+  phone: "",
+};
+
+function RequirementForm({ city, micromarkets, unit }) {
+  const [form, setForm] = useState(EMPTY_FORM);
+  const sizeOptions = getSizeOptions(unit);
+
+  // Reset the chosen size when the unit changes, since the labels change.
+  useEffect(() => {
+    setForm((previous) => ({ ...previous, size: "" }));
+  }, [unit]);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState({ type: "", message: "" });
+
+  const updateField = (field, value) => {
+    setForm((previous) => ({ ...previous, [field]: value }));
+    setErrors((previous) => ({ ...previous, [field]: "" }));
+    setStatus({ type: "", message: "" });
+  };
+
+  const validate = () => {
+    const nextErrors = {};
+    const phoneDigits = form.phone.replace(/\D/g, "");
+
+    if (!form.name.trim()) nextErrors.name = "Please enter your name.";
+    if (!phoneDigits) {
+      nextErrors.phone = "Phone number is required.";
+    } else if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
+      nextErrors.phone = "Enter a valid 10-digit mobile number.";
+    }
+    if (
+      form.email.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim())
+    ) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting || !validate()) return;
+
+    setSubmitting(true);
+    setStatus({ type: "", message: "" });
+
+    const location = getStoredUserLocation();
+    const details = [
+      `Size required: ${form.size || "Not specified"}`,
+      `Preferred micro-market: ${form.micromarket || "Any"}`,
+      `Move-in timeline: ${form.timeline || "Not specified"}`,
+      `Submitted from: ${city} city page`,
+    ].join("\n");
+
+    try {
+      const response = await fetch("/api/lead2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          company: form.company.trim(),
+          email: form.email.trim(),
+          fullPhone: `+91${form.phone.replace(/\D/g, "")}`,
+          requirementCity: city,
+          requirementDetails: details,
+          Street: location.area || "",
+          City: location.city || "",
+          Province: location.state || "",
+          Postal_Code: location.pincode || "",
+          Country: location.country || "",
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (response.ok && result?.success) {
+        setStatus({
+          type: "success",
+          message: `Thank you. A ${city} advisor will get in touch with you shortly.`,
+        });
+        setForm(EMPTY_FORM);
+      } else {
+        setStatus({
+          type: "error",
+          message:
+            result?.message ||
+            "We couldn't submit your requirement right now. Please try again.",
+        });
+      }
+    } catch (error) {
+      console.error("[CityPage] Requirement submission failed:", error);
+      setStatus({
+        type: "error",
+        message:
+          "We couldn't submit your requirement right now. Please try again.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 gap-8 rounded-2xl border border-[#E7E7EE] bg-white p-6 shadow-[0_6px_24px_rgba(28,35,64,0.05)] sm:p-8 lg:grid-cols-2 lg:gap-12 lg:p-10">
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B2F77]">
+          Can’t find the right fit?
+        </p>
+        <h2 className="mt-3 text-[24px] font-bold leading-tight text-[#1C2340] sm:text-[28px]">
+          Tell us what you need. We’ll bring you the shortlist.
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-[#4B5268]">
+          Share your requirement once. A {city} advisor calls you within{" "}
+          {ADVISOR_CALLBACK_HOURS} hours with options, including spaces not
+          listed online.
+        </p>
+        <ul className="mt-5 space-y-2.5">
+          {FORM_BENEFITS.map((item) => (
+            <li
+              key={item}
+              className="flex items-center gap-2.5 text-sm text-[#2D3348]"
+            >
+              <Check
+                className="h-4 w-4 shrink-0 text-[#7B2F77]"
+                strokeWidth={2.2}
+              />
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <form onSubmit={handleSubmit} noValidate className="min-w-0">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField label="Full name" required error={errors.name}>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+              className={inputClass(errors.name)}
+            />
+          </FormField>
+
+          <FormField label="Company">
+            <input
+              type="text"
+              value={form.company}
+              onChange={(event) => updateField("company", event.target.value)}
+              placeholder="Company name"
+              autoComplete="organization"
+              className={inputClass()}
+            />
+          </FormField>
+
+          <FormField label="Work email" error={errors.email}>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(event) => updateField("email", event.target.value)}
+              placeholder="you@company.com"
+              autoComplete="email"
+              className={inputClass(errors.email)}
+            />
+          </FormField>
+
+          <FormField label="Size required">
+            <select
+              value={form.size}
+              onChange={(event) => updateField("size", event.target.value)}
+              className={inputClass()}
+            >
+              <option value="">Select range</option>
+              {sizeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Preferred micro-market">
+            <select
+              value={form.micromarket}
+              onChange={(event) =>
+                updateField("micromarket", event.target.value)
+              }
+              className={inputClass()}
+            >
+              <option value="">Any</option>
+              {micromarkets.map((market) => (
+                <option key={market.name} value={market.name}>
+                  {market.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Move-in timeline">
+            <select
+              value={form.timeline}
+              onChange={(event) => updateField("timeline", event.target.value)}
+              className={inputClass()}
+            >
+              <option value="">Select</option>
+              {TIMELINE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField
+            label="Phone"
+            required
+            error={errors.phone}
+            className="sm:col-span-2"
+          >
+            <div
+              className={`flex h-11 overflow-hidden rounded-lg border bg-white transition focus-within:border-[#7B2F77] focus-within:ring-2 focus-within:ring-[#7B2F77]/15 ${
+                errors.phone ? "border-red-400" : "border-[#D9DAE3]"
+              }`}
+            >
+              <span className="flex items-center border-r border-[#E7E7EE] bg-[#F6F6F8] px-3 text-sm font-medium text-[#4B5268]">
+                +91
+              </span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={form.phone}
+                onChange={(event) =>
+                  updateField(
+                    "phone",
+                    event.target.value.replace(/\D/g, "").slice(0, 10),
+                  )
+                }
+                placeholder="10-digit mobile number"
+                autoComplete="tel-national"
+                className="min-w-0 flex-1 px-3 text-sm text-[#1C2340] outline-none placeholder:text-[#9A9FB0]"
+              />
+            </div>
+          </FormField>
+        </div>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{ backgroundColor: PURPLE }}
+          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-6 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {submitting ? "Submitting…" : "Get my shortlist"}
+        </button>
+
+        {status.message && (
+          <p
+            role="status"
+            className={`mt-3 text-sm ${
+              status.type === "success" ? "text-[#1F7A4D]" : "text-red-600"
+            }`}
+          >
+            {status.message}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function inputClass(error) {
+  return `h-11 w-full rounded-lg border bg-white px-3 text-sm text-[#1C2340] outline-none transition placeholder:text-[#9A9FB0] focus:border-[#7B2F77] focus:ring-2 focus:ring-[#7B2F77]/15 ${
+    error ? "border-red-400" : "border-[#D9DAE3]"
+  }`;
+}
+
+function FormField({
+  label,
+  required = false,
+  error,
+  className = "",
+  children,
+}) {
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <span className="mb-1.5 block text-xs font-semibold text-[#1C2340]">
+        {label}
+        {required && <span className="ml-0.5 text-[#A054A0]">*</span>}
+      </span>
+      {children}
+      {error && (
+        <span className="mt-1 block text-xs text-red-600">{error}</span>
+      )}
+    </label>
+  );
+}
+
 function EmptyProperties({ city }) {
   return (
     <div className="rounded-2xl border border-[#E5E7EB] bg-white px-5 py-12 text-center shadow-[0_4px_18px_rgba(21,35,60,0.035)] sm:px-8 sm:py-14">
@@ -393,11 +1071,11 @@ function EmptyProperties({ city }) {
         <Building2 size={25} strokeWidth={1.7} className="text-[#A054A0]" />
       </div>
       <h3 className="mt-5 text-lg font-semibold tracking-tight text-[#15233C]">
-        No featured properties found
+        No properties found
       </h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#647084]">
-        There are currently no featured properties available in {city}.
-        Please check back later for new listings.
+        There are currently no properties available in {city}. Please check
+        back later for new listings.
       </p>
     </div>
   );
@@ -405,10 +1083,13 @@ function EmptyProperties({ city }) {
 
 function PropertyGridSkeleton() {
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2 lg:gap-6 xl:grid-cols-3">
-      {Array.from({ length: 9 }).map((_, index) => (
-        <div key={index} className="min-w-0 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
-          <div className="aspect-square animate-pulse bg-[#EEF0F4]" />
+    <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div
+          key={index}
+          className="min-w-0 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm"
+        >
+          <div className="aspect-[3/2] animate-pulse bg-[#EEF0F4]" />
           <div className="space-y-4 p-4 sm:p-5">
             <div className="h-4 w-3/4 animate-pulse rounded-full bg-[#EEF0F4]" />
             <div className="h-3 w-1/2 animate-pulse rounded-full bg-[#EEF0F4]" />
