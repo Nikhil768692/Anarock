@@ -114,35 +114,6 @@ const popularCities = [
 ];
 
 
-const faqs = [
-  {
-    question: "What is commercial leasing?",
-    answer:
-      "Commercial leasing is the process through which businesses secure office or commercial real estate through structured lease agreements. It includes market analysis, property selection, lease negotiations and transaction execution. At Anarock, we help occupiers identify the right workplace solutions through data-driven market intelligence and advisory. Our commercial leasing services enable businesses to secure strategic locations while supporting long-term growth and operational flexibility.",
-  },
-  {
-    question: "How does office leasing work in India?",
-    answer:
-      "Office leasing in India begins with understanding business requirements, workforce needs and location preferences. The process involves market research, property evaluation, lease negotiations and transaction management. At Anarock, we guide occupiers through every stage of the office leasing lifecycle, helping them make informed decisions. Our advisory-led approach ensures businesses secure office spaces aligned with their operational and growth objectives.",
-  },
-  {
-    question: "What services do commercial leasing companies in India offer?",
-    answer:
-      "Commercial leasing companies provide market intelligence, tenant representation, property sourcing, workplace strategy, lease negotiations and portfolio optimisation services. These solutions help occupiers make informed real estate decisions while reducing transaction risks. At Anarock, we offer commercial leasing advisory backed by deep market expertise and occupier-focused solutions. Our services are designed to optimise workplace performance and business outcomes.",
-  },
-  {
-    question: "What is the average lease tenure in India?",
-    answer:
-      "Commercial office lease tenures in India typically range between three and nine years, depending on asset type, location and occupier requirements. Large enterprises often prefer longer tenures for stability and commercial advantages, while flexible workspaces offer shorter commitments. At Anarock, we advise occupiers on selecting lease structures that align with their business strategy and future expansion plans.",
-  },
-  {
-    question:
-      "What is the difference between leasing and renting commercial property?",
-    answer:
-      "Leasing generally involves longer-term agreements with customised commercial terms, while renting is often shorter-term and more standardised. Commercial leases offer greater flexibility around workplace planning, expansion rights and fit-out provisions. At Anarock, we help businesses evaluate leasing versus renting options based on operational requirements, financial goals and long-term growth plans.",
-  },
-
-];
 const features = [
   {
     icon: Users,
@@ -537,6 +508,7 @@ function PremiumDropdown({ id, name, value, placeholder, options, onChange }) {
 export default function HomePage() {
   const [phone, setPhone] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
+  const [faqs, setFaqs] = useState([]);
 
   const [phoneError, setPhoneError] = useState("");
   const [submitMessage, setSubmitMessage] = useState("");
@@ -768,6 +740,29 @@ export default function HomePage() {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 },
     );
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadFaqs = async () => {
+      try {
+        const response = await fetch("/api/faqs", {
+          signal: controller.signal,
+        });
+        const data = await response.json();
+        if (response.ok && data?.success && Array.isArray(data.data)) {
+          setFaqs(data.data);
+        }
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          console.error("Failed to fetch FAQs:", error);
+        }
+      }
+    };
+
+    loadFaqs();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -1218,7 +1213,7 @@ export default function HomePage() {
                 const isOpen = openFaq === index;
 
                 return (
-                  <article key={faq.question}>
+                  <article key={faq.id || faq.question}>
                     <button
                       type="button"
                       onClick={() => setOpenFaq(isOpen ? null : index)}
