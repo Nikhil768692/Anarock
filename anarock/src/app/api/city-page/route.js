@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const CATALYST_API_URL = "https://api.catalyst.zoho.in";
 const ADVISORS_TABLE = "CityAdvisors";
 const MARKET_STATS_TABLE = "CityMarketStats";
+const MICROMARKETS_TABLE = "CityMicromarkets";
 
 // Rows are cached in memory for 5 minutes, so edits made in the
 // Catalyst Data Store show up on the website within a few minutes.
@@ -149,7 +150,44 @@ function mapMarketStats(row) {
     absorptionMnSqft: toNumber(getField(row, "AbsorptionMnSqft")),
     newSupplyMnSqft: toNumber(getField(row, "NewSupplyMnSqft")),
     mostActiveMicromarket: toText(getField(row, "MostActiveMicromarket")),
+    preCommittedPercent: toNumber(getField(row, "PreCommittedPercent")),
+    trackingMonths: toNumber(getField(row, "TrackingMonths")),
+    insightMicromarket: toText(getField(row, "InsightMicromarket")),
+    insightYear: toNumber(getField(row, "InsightYear")),
   };
+}
+
+// One row per micro-market. Rent is in INR per sq ft per month.
+// PropertyMicromarket is optional: fill it only when the micro-market name
+// used on the properties is different from MicromarketName
+// (for example "BLR CBD" on properties and "CBD" on the city page).
+function mapMicromarkets(rows, city) {
+  const target = normalizeCity(city);
+  const byName = new Map();
+
+  rows
+    .filter((row) => normalizeCity(getField(row, "CityName")) === target)
+    .sort((a, b) => getTimestamp(b) - getTimestamp(a))
+    .forEach((row) => {
+      const name = toText(getField(row, "MicromarketName"));
+      const key = name.toLowerCase();
+      if (!name || byName.has(key)) return;
+
+      byName.set(key, {
+        name,
+        propertyMicromarket: toText(getField(row, "PropertyMicromarket")),
+        rentMin: toNumber(getField(row, "RentMin")),
+        rentMax: toNumber(getField(row, "RentMax")),
+        sortOrder: toNumber(getField(row, "SortOrder")),
+      });
+    });
+
+  return [...byName.values()].sort(
+    (a, b) =>
+      (a.sortOrder ?? Number.MAX_SAFE_INTEGER) -
+        (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
+      a.name.localeCompare(b.name),
+  );
 }
 
 async function settle(promise, label) {
@@ -177,9 +215,10 @@ export async function GET(request) {
 
   // Each table is loaded independently, so a problem with one table
   // does not hide the data from the other.
-  const [advisorRows, marketRows] = await Promise.all([
+  const [advisorRows, marketRows, micromarketRows] = await Promise.all([
     settle(getCachedRows(ADVISORS_TABLE), ADVISORS_TABLE),
     settle(getCachedRows(MARKET_STATS_TABLE), MARKET_STATS_TABLE),
+    settle(getCachedRows(MICROMARKETS_TABLE), MICROMARKETS_TABLE),
   ]);
 
   return NextResponse.json(
@@ -192,6 +231,9 @@ export async function GET(request) {
       market: marketRows
         ? mapMarketStats(pickLatestRowForCity(marketRows, city))
         : null,
+      micromarkets: micromarketRows
+        ? mapMicromarkets(micromarketRows, city)
+        : [],
     },
     {
       status: 200,

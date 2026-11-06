@@ -22,7 +22,7 @@ const MIN_COMPARE_PROPERTIES = 2;
 const PROPERTIES_TO_SHOW = 8;
 const MICROMARKETS_TO_SHOW = 6;
 
-const NAVY = "#1C2340";
+const DARK = "#0A0A0A";
 const PURPLE = "#7B2F77";
 
 /* ------------------------------------------------------------------ */
@@ -34,14 +34,37 @@ const HERO_TITLE = "Find your next office in India’s office capital";
 const ADVISOR_BLURB =
   "Get an off-market shortlist and rental benchmarks for your requirement, at no cost to occupiers.";
 
-const INSIGHT = {
-  title:
-    "[X]% of new Grade A space on ORR was pre-committed before completion in 2026.",
-  body: "The best floors often never reach a listing. Our advisors track buildings [X] months before they open.",
-  cta: "Ask what’s coming up",
-};
+// Everything in this card comes from the CityMarketStats table:
+// PreCommittedPercent, TrackingMonths, InsightMicromarket and InsightYear.
+// If InsightMicromarket is empty, MostActiveMicromarket is used, and if that
+// is empty too the sentence uses the city name. If InsightYear is empty, the
+// year from QuarterLabel is used. The card stays hidden until both numbers exist.
+function getInsight(market, city) {
+  const percent = market?.preCommittedPercent;
+  const months = market?.trackingMonths;
 
-const ADVISOR_CALLBACK_HOURS = "[X]";
+  if (!Number.isFinite(percent) || !Number.isFinite(months)) return null;
+
+  const micromarket =
+    market?.insightMicromarket || market?.mostActiveMicromarket || "";
+  const place = micromarket ? `on ${micromarket}` : `in ${city}`;
+
+  const quarterYear = String(market?.quarterLabel || "").match(/\b(19|20)\d{2}\b/);
+  const year = Number.isFinite(market?.insightYear)
+    ? String(market.insightYear)
+    : quarterYear
+      ? quarterYear[0]
+      : "";
+  const completion = year ? `before completion in ${year}` : "before completion";
+
+  return {
+    title: `${formatNumber(percent)}% of new Grade A space ${place} was pre-committed ${completion}.`,
+    body: `The best floors often never reach a listing. Our advisors track buildings ${formatNumber(months, 0)} months before they open.`,
+    cta: "Ask what’s coming up",
+  };
+}
+
+const ADVISOR_CALLBACK_HOURS = 24;
 
 const FORM_BENEFITS = [
   "Off-market and pre-lease options",
@@ -146,6 +169,29 @@ function formatRent(rentInrPerSqft, currency, unit, exchangeRates) {
   })}`;
 }
 
+// Micro-market rent band, stored in INR per sq ft per month.
+function formatRentBand(min, max, currency, unit, exchangeRates) {
+  const values = [min, max].filter((value) => Number.isFinite(value));
+  if (values.length === 0) return "";
+
+  const unitLabel = getUnitLabel(unit);
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const lowText = formatRent(low, currency, unit, exchangeRates);
+
+  if (low === high) return `${lowText} /${unitLabel}`;
+
+  const highText = formatRent(high, currency, unit, exchangeRates).replace(
+    /^[^\d]+/,
+    "",
+  );
+  return `${lowText}–${highText} /${unitLabel}`;
+}
+
+function normalizeMicromarket(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 // Absorption and supply are stored in million sq ft.
 function formatMillionArea(valueMnSqft, unit) {
   if (!Number.isFinite(valueMnSqft)) return "—";
@@ -177,7 +223,11 @@ export default function CityPageClient({ city }) {
   const [allProperties, setAllProperties] = useState([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
   const [propertyError, setPropertyError] = useState("");
-  const [cityData, setCityData] = useState({ advisor: null, market: null });
+  const [cityData, setCityData] = useState({
+    advisor: null,
+    market: null,
+    micromarkets: [],
+  });
   const [loadingCityData, setLoadingCityData] = useState(true);
 
   const citySlug = toUrlValue(city);
@@ -231,6 +281,9 @@ export default function CityPageClient({ city }) {
           setCityData({
             advisor: json.advisor || null,
             market: json.market || null,
+            micromarkets: Array.isArray(json.micromarkets)
+              ? json.micromarkets
+              : [],
           });
         }
       } catch (error) {
@@ -277,13 +330,17 @@ export default function CityPageClient({ city }) {
 
   const visibleProperties = allProperties.slice(0, PROPERTIES_TO_SHOW);
 
+  // Micro-markets come from the CityMicromarkets table (name + rent band).
+  // Property counts are worked out from this city's properties.
+  // If the table has no rows for this city, the list falls back to the
+  // micro-markets found on the properties.
   const micromarkets = useMemo(() => {
     const counts = new Map();
 
     for (const property of allProperties) {
       const name = String(property?.micromarket || "").trim();
       if (!name) continue;
-      const key = name.toLowerCase();
+      const key = normalizeMicromarket(name);
       const current = counts.get(key);
       counts.set(key, {
         name: current?.name || name,
@@ -291,10 +348,28 @@ export default function CityPageClient({ city }) {
       });
     }
 
+    const tableRows = cityData.micromarkets || [];
+
+    if (tableRows.length > 0) {
+      return tableRows.map((row) => {
+        const match =
+          counts.get(normalizeMicromarket(row.propertyMicromarket)) ||
+          counts.get(normalizeMicromarket(row.name));
+
+        return {
+          name: row.name,
+          filterName: match?.name || row.propertyMicromarket || row.name,
+          count: match?.count || 0,
+          rentMin: row.rentMin,
+          rentMax: row.rentMax,
+        };
+      });
+    }
+
     return [...counts.values()]
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-      .slice(0, MICROMARKETS_TO_SHOW);
-  }, [allProperties]);
+      .map((item) => ({ ...item, filterName: item.name }));
+  }, [allProperties, cityData.micromarkets]);
 
   const handleCompareToggle = (property) => {
     const propertyId = getPropertyId(property);
@@ -365,13 +440,14 @@ export default function CityPageClient({ city }) {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const insight = getInsight(cityData.market, city);
   const totalProperties = allProperties.length;
   const countLabel = loadingProperties
     ? "…"
     : totalProperties.toLocaleString("en-IN");
 
   return (
-    <main className="w-full min-w-0 bg-[#F6F6F8] text-[#1C2340]">
+    <main className="w-full min-w-0 bg-[#F6F6F8] text-black">
       <Breadcrumbs
         items={[
           { label: "Popular Cities", href: "/#popularCities" },
@@ -386,10 +462,10 @@ export default function CityPageClient({ city }) {
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#A054A0] sm:text-xs">
               Commercial office space · {city}
             </p>
-            <h1 className="mt-4 max-w-[640px] text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-[#1C2340] sm:text-[42px] lg:text-[48px]">
+            <h1 className="mt-4 max-w-[640px] text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-black sm:text-[42px] lg:text-[48px]">
               {HERO_TITLE}
             </h1>
-            <p className="mt-5 max-w-[560px] text-[15px] leading-7 text-[#4B5268] sm:text-base">
+            <p className="mt-5 max-w-[560px] text-[15px] leading-7 text-black/75 sm:text-base">
               {countLabel} verified Grade A buildings across {city}’s key
               micro-markets, with live rentals from ANAROCK Research and
               advisors who close deals here every week.
@@ -416,45 +492,83 @@ export default function CityPageClient({ city }) {
 
       {/* EXPLORE BY MICRO-MARKET */}
       <section className="mx-auto w-full max-w-[1280px] px-4 pt-12 sm:px-6 sm:pt-14 lg:px-10 lg:pt-16">
-        <h2 className="text-[24px] font-bold tracking-[-0.01em] text-[#1C2340] sm:text-[28px]">
+        <h2 className="text-[24px] font-bold tracking-[-0.01em] text-black sm:text-[28px]">
           Explore by micro-market
         </h2>
-        <p className="mt-1.5 text-sm text-[#4B5268]">
+        <p className="mt-1.5 text-sm text-black/75">
           Each area has its own rent band, tenant mix and supply pipeline.
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
-          {loadingProperties
+          {loadingProperties || loadingCityData
             ? Array.from({ length: MICROMARKETS_TO_SHOW }).map((_, index) => (
                 <div
                   key={index}
                   className="h-[118px] animate-pulse rounded-xl border border-[#E7E7EE] bg-white"
                 />
               ))
-            : micromarkets.map((market) => (
-                <Link
-                  key={market.name}
-                  href={`${allPropertiesUrl}&micromarket=${encodeURIComponent(toUrlValue(market.name))}`}
-                  className="group flex min-w-0 flex-col rounded-xl border border-[#E7E7EE] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#A054A0]/50 hover:shadow-md"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#F4EAF2] text-[#A054A0]">
-                    <Building2 className="h-4 w-4" strokeWidth={1.8} />
-                  </span>
-                  <span className="mt-3 truncate text-sm font-bold text-[#1C2340]">
-                    {market.name}
-                  </span>
-                  <span className="mt-2 text-xs font-semibold text-[#7B2F77] group-hover:underline">
-                    {market.count}{" "}
-                    {market.count === 1 ? "property" : "properties"} →
-                  </span>
-                </Link>
-              ))}
+            : micromarkets.map((market) => {
+                const rentBand = formatRentBand(
+                  market.rentMin,
+                  market.rentMax,
+                  currency,
+                  unit,
+                  exchangeRates,
+                );
+                const content = (
+                  <>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#F4EAF2] text-[#A054A0]">
+                      <Building2 className="h-4 w-4" strokeWidth={1.8} />
+                    </span>
+                    <span className="mt-3 truncate text-sm font-bold text-black">
+                      {market.name}
+                    </span>
+                    {rentBand && (
+                      <span className="mt-1 truncate text-xs text-black/75">
+                        {rentBand}
+                      </span>
+                    )}
+                    <span
+                      className={`mt-2 text-xs font-semibold ${
+                        market.count > 0
+                          ? "text-[#7B2F77] group-hover:underline"
+                          : "text-black/40"
+                      }`}
+                    >
+                      {market.count > 0
+                        ? `${market.count} ${market.count === 1 ? "property" : "properties"} →`
+                        : "No listings yet"}
+                    </span>
+                  </>
+                );
+
+                if (market.count === 0) {
+                  return (
+                    <div
+                      key={market.name}
+                      className="flex min-w-0 flex-col rounded-xl border border-[#E7E7EE] bg-white p-4"
+                    >
+                      {content}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={market.name}
+                    href={`${allPropertiesUrl}&micromarket=${encodeURIComponent(toUrlValue(market.filterName))}`}
+                    className="group flex min-w-0 flex-col rounded-xl border border-[#E7E7EE] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#A054A0]/50 hover:shadow-md"
+                  >
+                    {content}
+                  </Link>
+                );
+              })}
         </div>
       </section>
 
       {/* OFFICE SPACES */}
       <section className="mx-auto w-full max-w-[1280px] px-4 pt-12 sm:px-6 sm:pt-14 lg:px-10 lg:pt-16">
-        <h2 className="text-[24px] font-bold tracking-[-0.01em] text-[#1C2340] sm:text-[28px]">
+        <h2 className="text-[24px] font-bold tracking-[-0.01em] text-black sm:text-[28px]">
           {countLabel} office spaces available
         </h2>
 
@@ -477,22 +591,26 @@ export default function CityPageClient({ city }) {
                 {visibleProperties.map((property, index) => (
                   <PropertyGridItem
                     key={getPropertyId(property) || index}
-                    index={index}
                     property={property}
                     isCompared={compareSelection.some(
                       (item) => getPropertyId(item) === getPropertyId(property),
                     )}
                     onCompareToggle={() => handleCompareToggle(property)}
-                    onInsightClick={scrollToRequirementForm}
                   />
                 ))}
+                {insight && (
+                  <InsightCard
+                    insight={insight}
+                    onClick={scrollToRequirementForm}
+                  />
+                )}
               </div>
 
               {totalProperties > visibleProperties.length && (
                 <div className="flex justify-center pt-8 sm:pt-10">
                   <Link
                     href={allPropertiesUrl}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#1C2340]/70 bg-white px-6 text-sm font-semibold text-[#1C2340] transition hover:border-[#7B2F77] hover:text-[#7B2F77]"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/70 bg-white px-6 text-sm font-semibold text-black transition hover:border-[#7B2F77] hover:text-[#7B2F77]"
                   >
                     Show all {countLabel} properties
                     <ArrowRight className="h-4 w-4" />
@@ -524,12 +642,12 @@ export default function CityPageClient({ city }) {
                 />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#15233C]">
+                <p className="text-sm font-semibold text-black">
                   {compareSelection.length}{" "}
                   {compareSelection.length === 1 ? "property" : "properties"}{" "}
                   selected
                 </p>
-                <p className="mt-1 text-xs leading-5 text-[#647084]">
+                <p className="mt-1 text-xs leading-5 text-black/75">
                   Select 2 or 3 properties to compare.
                 </p>
               </div>
@@ -539,7 +657,7 @@ export default function CityPageClient({ city }) {
               <button
                 type="button"
                 onClick={clearCompareSelection}
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-sm font-medium text-[#475467] transition-colors duration-200 hover:border-[#D1D5DB] hover:bg-[#F8F9FB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A054A0] focus-visible:ring-offset-2 sm:flex-none"
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-sm font-medium text-black/75 transition-colors duration-200 hover:border-[#D1D5DB] hover:bg-[#F8F9FB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A054A0] focus-visible:ring-offset-2 sm:flex-none"
               >
                 <X size={16} />
                 Clear
@@ -548,7 +666,7 @@ export default function CityPageClient({ city }) {
                 type="button"
                 onClick={openComparePage}
                 disabled={compareSelection.length < MIN_COMPARE_PROPERTIES}
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#15233C] px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#A054A0] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A054A0] focus-visible:ring-offset-2 sm:flex-none sm:px-5"
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#A054A0] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A054A0] focus-visible:ring-offset-2 sm:flex-none sm:px-5"
               >
                 <GitCompare size={16} />
                 Compare ({compareSelection.length})
@@ -613,18 +731,18 @@ function AdvisorCard({ city, advisor, loading }) {
           </span>
         )}
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-bold text-[#1C2340]">
+          <p className="truncate text-[15px] font-bold text-black">
             {advisor.name}
           </p>
           {subtitle && (
-            <p className="mt-0.5 text-xs leading-5 text-[#5B6175]">
+            <p className="mt-0.5 text-xs leading-5 text-black/75">
               {subtitle}
             </p>
           )}
         </div>
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-[#4B5268]">{ADVISOR_BLURB}</p>
+      <p className="mt-4 text-sm leading-6 text-black/75">{ADVISOR_BLURB}</p>
     </aside>
   );
 }
@@ -676,9 +794,9 @@ function MarketSection({
   ];
 
   return (
-    <section style={{ backgroundColor: NAVY }} className="w-full text-white">
+    <section className="w-full bg-white text-black">
       <div className="mx-auto w-full max-w-[1280px] px-4 py-10 sm:px-6 sm:py-12 lg:px-10 lg:py-14">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#D7B6D6] sm:text-xs">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#7B2F77] sm:text-xs">
           {city} office market{quarter ? ` · ${quarter}` : ""}
         </p>
         <h2 className="mt-2 text-[22px] font-bold sm:text-[26px]">
@@ -689,18 +807,18 @@ function MarketSection({
           {stats.map((stat) => (
             <div
               key={stat.label}
-              className="min-w-0 rounded-xl border border-white/10 bg-[#29304C] p-4 sm:p-5"
+              className="min-w-0 rounded-xl border border-[#E7E7EE] bg-white p-4 shadow-[0_4px_16px_rgba(0,0,0,0.04)] sm:p-5"
             >
-              <p className="text-xs text-white/75">{stat.label}</p>
+              <p className="text-xs text-black/75">{stat.label}</p>
               {loading ? (
-                <div className="mt-2 h-8 w-20 animate-pulse rounded bg-white/10" />
+                <div className="mt-2 h-8 w-20 animate-pulse rounded bg-black/10" />
               ) : (
                 <p className="mt-1.5 truncate text-[24px] font-bold leading-tight sm:text-[28px]">
                   {stat.value}
                 </p>
               )}
               {stat.note && (
-                <p className="mt-1 text-[11px] leading-4 text-white/70">
+                <p className="mt-1 text-[11px] leading-4 text-black/75">
                   {stat.note}
                 </p>
               )}
@@ -712,46 +830,37 @@ function MarketSection({
   );
 }
 
-function PropertyGridItem({
-  index,
-  property,
-  isCompared,
-  onCompareToggle,
-  onInsightClick,
-}) {
+function PropertyGridItem({ property, isCompared, onCompareToggle }) {
   return (
-    <>
-      {index === 3 && <InsightCard onClick={onInsightClick} />}
-      <div className="min-w-0">
-        <PropertyCard
-          property={property}
-          isCompared={isCompared}
-          onCompareToggle={onCompareToggle}
-        />
-      </div>
-    </>
+    <div className="min-w-0">
+      <PropertyCard
+        property={property}
+        isCompared={isCompared}
+        onCompareToggle={onCompareToggle}
+      />
+    </div>
   );
 }
 
-function InsightCard({ onClick }) {
+function InsightCard({ insight, onClick }) {
   return (
     <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-[#E8D9E6] bg-[#F4EAF2] p-6 sm:p-7">
       <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B2F77]">
         <Lightbulb className="h-4 w-4" strokeWidth={1.8} />
         Did you know?
       </p>
-      <p className="mt-3 text-[20px] font-bold leading-snug text-[#1C2340] sm:text-[22px]">
-        {INSIGHT.title}
+      <p className="mt-3 text-[20px] font-bold leading-snug text-black sm:text-[22px]">
+        {insight.title}
       </p>
-      <p className="mt-3 text-sm leading-6 text-[#4B5268]">{INSIGHT.body}</p>
+      <p className="mt-3 text-sm leading-6 text-black/75">{insight.body}</p>
       <div>
         <button
           type="button"
           onClick={onClick}
-          style={{ backgroundColor: NAVY }}
+          style={{ backgroundColor: DARK }}
           className="mt-5 inline-flex min-h-10 items-center rounded-md px-4 text-sm font-semibold text-white transition hover:opacity-90"
         >
-          {INSIGHT.cta}
+          {insight.cta}
         </button>
       </div>
     </div>
@@ -816,9 +925,10 @@ function RequirementForm({ city, micromarkets, unit }) {
 
     const location = getStoredUserLocation();
     const details = [
-      `Size required: ${form.size || "Not specified"}`,
-      `Preferred micro-market: ${form.micromarket || "Any"}`,
-      `Move-in timeline: ${form.timeline || "Not specified"}`,
+      // Re-enable these lines together with the hidden form fields.
+      // `Size required: ${form.size || "Not specified"}`,
+      // `Preferred micro-market: ${form.micromarket || "Any"}`,
+      // `Move-in timeline: ${form.timeline || "Not specified"}`,
       `Submitted from: ${city} city page`,
     ].join("\n");
 
@@ -874,10 +984,10 @@ function RequirementForm({ city, micromarkets, unit }) {
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B2F77]">
           Can’t find the right fit?
         </p>
-        <h2 className="mt-3 text-[24px] font-bold leading-tight text-[#1C2340] sm:text-[28px]">
+        <h2 className="mt-3 text-[24px] font-bold leading-tight text-black sm:text-[28px]">
           Tell us what you need. We’ll bring you the shortlist.
         </h2>
-        <p className="mt-3 text-sm leading-6 text-[#4B5268]">
+        <p className="mt-3 text-sm leading-6 text-black/75">
           Share your requirement once. A {city} advisor calls you within{" "}
           {ADVISOR_CALLBACK_HOURS} hours with options, including spaces not
           listed online.
@@ -886,7 +996,7 @@ function RequirementForm({ city, micromarkets, unit }) {
           {FORM_BENEFITS.map((item) => (
             <li
               key={item}
-              className="flex items-center gap-2.5 text-sm text-[#2D3348]"
+              className="flex items-center gap-2.5 text-sm text-black/75"
             >
               <Check
                 className="h-4 w-4 shrink-0 text-[#7B2F77]"
@@ -911,6 +1021,35 @@ function RequirementForm({ city, micromarkets, unit }) {
             />
           </FormField>
 
+          <FormField
+            label="Phone"
+            required
+            error={errors.phone}
+          >
+            <div
+              className={`flex h-11 overflow-hidden rounded-lg border bg-white transition focus-within:border-[#7B2F77] focus-within:ring-2 focus-within:ring-[#7B2F77]/15 ${
+                errors.phone ? "border-red-400" : "border-[#D9DAE3]"
+              }`}
+            >
+              <span className="flex items-center border-r border-[#E7E7EE] bg-[#F6F6F8] px-3 text-sm font-medium text-black/75">
+                +91
+              </span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={form.phone}
+                onChange={(event) =>
+                  updateField(
+                    "phone",
+                    event.target.value.replace(/\D/g, "").slice(0, 10),
+                  )
+                }
+                placeholder="Mobile number"
+                autoComplete="tel-national"
+                className="min-w-0 flex-1 px-3 text-sm text-black outline-none placeholder:text-black/40"
+              />
+            </div>
+          </FormField>
           <FormField label="Company">
             <input
               type="text"
@@ -933,83 +1072,56 @@ function RequirementForm({ city, micromarkets, unit }) {
             />
           </FormField>
 
-          <FormField label="Size required">
-            <select
-              value={form.size}
-              onChange={(event) => updateField("size", event.target.value)}
-              className={inputClass()}
-            >
-              <option value="">Select range</option>
-              {sizeOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </FormField>
+          {/*
+            Hidden for now. Uncomment to show these fields again.
 
-          <FormField label="Preferred micro-market">
-            <select
-              value={form.micromarket}
-              onChange={(event) =>
-                updateField("micromarket", event.target.value)
-              }
-              className={inputClass()}
-            >
-              <option value="">Any</option>
-              {micromarkets.map((market) => (
-                <option key={market.name} value={market.name}>
-                  {market.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
+            <FormField label="Size required">
+              <select
+                value={form.size}
+                onChange={(event) => updateField("size", event.target.value)}
+                className={inputClass()}
+              >
+                <option value="">Select range</option>
+                {sizeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-          <FormField label="Move-in timeline">
-            <select
-              value={form.timeline}
-              onChange={(event) => updateField("timeline", event.target.value)}
-              className={inputClass()}
-            >
-              <option value="">Select</option>
-              {TIMELINE_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </FormField>
-
-          <FormField
-            label="Phone"
-            required
-            error={errors.phone}
-            className="sm:col-span-2"
-          >
-            <div
-              className={`flex h-11 overflow-hidden rounded-lg border bg-white transition focus-within:border-[#7B2F77] focus-within:ring-2 focus-within:ring-[#7B2F77]/15 ${
-                errors.phone ? "border-red-400" : "border-[#D9DAE3]"
-              }`}
-            >
-              <span className="flex items-center border-r border-[#E7E7EE] bg-[#F6F6F8] px-3 text-sm font-medium text-[#4B5268]">
-                +91
-              </span>
-              <input
-                type="tel"
-                inputMode="numeric"
-                value={form.phone}
+            <FormField label="Preferred micro-market">
+              <select
+                value={form.micromarket}
                 onChange={(event) =>
-                  updateField(
-                    "phone",
-                    event.target.value.replace(/\D/g, "").slice(0, 10),
-                  )
+                  updateField("micromarket", event.target.value)
                 }
-                placeholder="10-digit mobile number"
-                autoComplete="tel-national"
-                className="min-w-0 flex-1 px-3 text-sm text-[#1C2340] outline-none placeholder:text-[#9A9FB0]"
-              />
-            </div>
-          </FormField>
+                className={inputClass()}
+              >
+                <option value="">Any</option>
+                {micromarkets.map((market) => (
+                  <option key={market.name} value={market.name}>
+                    {market.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Move-in timeline">
+              <select
+                value={form.timeline}
+                onChange={(event) => updateField("timeline", event.target.value)}
+                className={inputClass()}
+              >
+                <option value="">Select</option>
+                {TIMELINE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          */}
         </div>
 
         <button
@@ -1038,7 +1150,7 @@ function RequirementForm({ city, micromarkets, unit }) {
 }
 
 function inputClass(error) {
-  return `h-11 w-full rounded-lg border bg-white px-3 text-sm text-[#1C2340] outline-none transition placeholder:text-[#9A9FB0] focus:border-[#7B2F77] focus:ring-2 focus:ring-[#7B2F77]/15 ${
+  return `h-11 w-full rounded-lg border bg-white px-3 text-sm text-black outline-none transition placeholder:text-black/40 focus:border-[#7B2F77] focus:ring-2 focus:ring-[#7B2F77]/15 ${
     error ? "border-red-400" : "border-[#D9DAE3]"
   }`;
 }
@@ -1052,7 +1164,7 @@ function FormField({
 }) {
   return (
     <label className={`block min-w-0 ${className}`}>
-      <span className="mb-1.5 block text-xs font-semibold text-[#1C2340]">
+      <span className="mb-1.5 block text-xs font-semibold text-black">
         {label}
         {required && <span className="ml-0.5 text-[#A054A0]">*</span>}
       </span>
@@ -1070,10 +1182,10 @@ function EmptyProperties({ city }) {
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F8EFF8]">
         <Building2 size={25} strokeWidth={1.7} className="text-[#A054A0]" />
       </div>
-      <h3 className="mt-5 text-lg font-semibold tracking-tight text-[#15233C]">
+      <h3 className="mt-5 text-lg font-semibold tracking-tight text-black">
         No properties found
       </h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#647084]">
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-black/75">
         There are currently no properties available in {city}. Please check
         back later for new listings.
       </p>
