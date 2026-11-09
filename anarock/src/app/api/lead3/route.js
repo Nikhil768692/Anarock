@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
+import { getClientIp } from "@/lib/requestGuard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -108,19 +109,7 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 10;
 
 function getClientIdentifier(request) {
-    const forwardedFor = request.headers.get("x-forwarded-for");
-
-    if (forwardedFor) {
-        return forwardedFor.split(",")[0].trim().slice(0, 100);
-    }
-
-    const realIp = request.headers.get("x-real-ip");
-
-    if (realIp) {
-        return realIp.trim().slice(0, 100);
-    }
-
-    return "unknown";
+    return getClientIp(request);
 }
 
 function checkRateLimit(request) {
@@ -497,16 +486,11 @@ function buildInterestedProperties(selectedProperties) {
             },
         });
     }
-    console.log(
-        "[SHORTLIST] Interested Properties:",
-        JSON.stringify(rows, null, 2),
-    );
     return rows;
 }
 
 async function createLeadInCRM(tokenInfo, recordData) {
     const url = `${tokenInfo.apiDomain}/crm/v8/Leads`;
-    console.log("[ZOHO CRM] Creating Lead:", JSON.stringify(recordData, null, 2));
     const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -532,7 +516,6 @@ async function createLeadInCRM(tokenInfo, recordData) {
     }
 
     console.log("[ZOHO CRM] HTTP STATUS:", response.status);
-    console.log("[ZOHO CRM] FULL RESPONSE:", JSON.stringify(data, null, 2));
     if (response.status === 401) {
         const error = new Error("Zoho access token expired.");
         error.code = "ZOHO_ACCESS_TOKEN_EXPIRED";
@@ -634,8 +617,8 @@ async function createLeadInCRM(tokenInfo, recordData) {
             throw error;
         }
         console.log(
-            "[ZOHO CRM] DUPLICATE UPDATE RESPONSE:",
-            JSON.stringify(updateResponseData, null, 2),
+            "[ZOHO CRM] Duplicate update HTTP status:",
+            updateResponse.status,
         );
         if (updateResponse.status === 401) {
             const error = new Error(
@@ -765,7 +748,6 @@ export async function POST(request) {
                     requirementCity:
                         body?.requirementCity || body?.lastSearchedCity || "",
                     requirementType: body?.requirementType || "",
-                    requirementDetails: body?.requirementDetails || "",
                 },
                 null,
                 2,
@@ -776,12 +758,8 @@ export async function POST(request) {
             : [];
         const interestedProperties = buildInterestedProperties(selectedProperties);
         console.log(
-            "[ENQUIRY] Selected properties from frontend:",
-            JSON.stringify(selectedProperties, null, 2),
-        );
-        console.log(
-            "[ENQUIRY] Final CRM subform:",
-            JSON.stringify(interestedProperties, null, 2),
+            "[ENQUIRY] Interested properties:",
+            interestedProperties.length,
         );
         let firstName = normalizeText(body?.firstName);
         let lastName = normalizeText(body?.lastName);
@@ -881,23 +859,10 @@ export async function POST(request) {
             location?.displayName ||
             [addressCity, state, country].filter(Boolean).join(", "),
         );
-        console.log(
-            "[ENQUIRY] CURRENT USER LOCATION RECEIVED:",
-            JSON.stringify(
-                {
-                    detectedLocation,
-                    street,
-                    city: addressCity,
-                    state,
-                    country,
-                    pincode,
-                    latitude,
-                    longitude,
-                },
-                null,
-                2,
-            ),
-        );
+        console.log("[ENQUIRY] Location received:", {
+            requestId,
+            hasLocation: Boolean(detectedLocation),
+        });
 
         const rawRequirementCity = normalizeText(
             body?.requirementCity ||
@@ -1110,8 +1075,6 @@ export async function POST(request) {
                 }
             });
 
-            console.log(JSON.stringify(recordData, null, 2));
-
             const result = await createLeadInCRM(currentToken, recordData);
             return {
                 ...result,
@@ -1231,10 +1194,9 @@ export async function POST(request) {
             {
                 success: false,
                 message:
-                    error?.message || "Something went wrong while creating the Lead.",
-                errorCode: error?.code || "REQUEST_FAILED",
+                    "Something went wrong while creating the lead. Please try again.",
+                errorCode: "REQUEST_FAILED",
                 requestId,
-                zohoResponse: error?.zohoResponse || null,
             },
             {
                 status: httpStatus >= 400 && httpStatus < 600 ? httpStatus : 500,

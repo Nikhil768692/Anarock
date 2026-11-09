@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAllProperties } from "@/lib/propertiesCache";
+import { createRateLimiter, readJsonBody } from "@/lib/requestGuard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,52 @@ const CACHE_TTL = 5 * 60 * 1000;
 const queryCache =
     globalThis.__anarockAiQueryCache ||
     (globalThis.__anarockAiQueryCache = new Map());
+
+// Limits that keep the paid Gemini API from being abused.
+const checkMinuteLimit = createRateLimiter({
+    name: "AI_SEARCH_MINUTE",
+    windowMs: 60 * 1000,
+    max: 20,
+});
+const checkDailyLimit = createRateLimiter({
+    name: "AI_SEARCH_DAY",
+    windowMs: 24 * 60 * 60 * 1000,
+    max: 300,
+});
+
+// Total Gemini calls allowed per server instance per day (all visitors).
+// Repeated queries are answered from the cache and do not count.
+const GEMINI_DAILY_LIMIT = Math.max(
+    1,
+    Number.parseInt(process.env.AI_SEARCH_DAILY_LIMIT || "2000", 10) || 2000,
+);
+const geminiUsage =
+    globalThis.__anarockGeminiUsage ||
+    (globalThis.__anarockGeminiUsage = { day: "", count: 0 });
+
+function reserveGeminiCall() {
+    const today = new Date().toISOString().slice(0, 10);
+    if (geminiUsage.day !== today) {
+        geminiUsage.day = today;
+        geminiUsage.count = 0;
+    }
+    if (geminiUsage.count >= GEMINI_DAILY_LIMIT) {
+        const error = new Error("Daily AI search limit reached.");
+        error.code = "AI_DAILY_LIMIT";
+        throw error;
+    }
+    geminiUsage.count += 1;
+}
+
+function aiSearchError(message, status, extraHeaders = {}) {
+    return NextResponse.json(
+        { success: false, error: message },
+        {
+            status,
+            headers: { "Cache-Control": "no-store", ...extraHeaders },
+        },
+    );
+}
 function str(value) {
     return String(value ?? "").trim();
 }
@@ -462,9 +509,7 @@ async function interpretQuery(prompt) {
         console.error(
             "[AI Search] GEMINI_API_KEY is missing from the server environment.",
         );
-        throw new Error(
-            "AI search is not configured. Check your .env file and restart the server.",
-        );
+        throw new Error("AI search is not configured.");
     }
     const cacheKey = norm(prompt);
     const cached = queryCache.get(cacheKey);
@@ -482,6 +527,7 @@ async function interpretQuery(prompt) {
         const maxRetries = 2;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
+                reserveGeminiCall();
                 const response = await fetch(
                     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
                     {
@@ -589,6 +635,7 @@ Rules:
                 return extraction;
             } catch (err) {
                 lastError = err;
+                if (err?.code === "AI_DAILY_LIMIT") break;
                 if (attempt < maxRetries) {
                     await new Promise((resolve) => setTimeout(resolve, 1000));
                     continue;
@@ -830,8 +877,30 @@ function sortResults(results, sort) {
 }
 
 export async function POST(request) {
+    const minuteLimit = checkMinuteLimit(request);
+    const dailyLimit = minuteLimit.allowed
+        ? checkDailyLimit(request)
+        : { allowed: true };
+
+    if (!minuteLimit.allowed || !dailyLimit.allowed) {
+        const retryAfter = !minuteLimit.allowed
+            ? minuteLimit.retryAfter
+            : dailyLimit.retryAfter;
+        return aiSearchError(
+            "Too many AI searches. Please wait a little or use the filters.",
+            429,
+            { "Retry-After": String(retryAfter) },
+        );
+    }
+
+    const parsedBody = await readJsonBody(request, 10_000);
+
+    if (!parsedBody.ok) {
+        return aiSearchError(parsedBody.message, parsedBody.status);
+    }
+
     try {
-        const body = await request.json().catch(() => ({}));
+        const body = parsedBody.data;
         const prompt = str(body.prompt).slice(0, 1000);
         if (!prompt) {
             return NextResponse.json(
@@ -846,14 +915,14 @@ export async function POST(request) {
         const geminiKey = String(process.env.GEMINI_API_KEY || "").trim();
 
         if (!geminiKey) {
+            console.error(
+                "[AI Search] GEMINI_API_KEY is missing. Add it to the server environment variables and redeploy.",
+            );
             return NextResponse.json(
                 {
                     success: false,
-                    code: "GEMINI_API_KEY_MISSING",
-                    error:
-                        "AI Search is not configured on the server. " +
-                        "Add GEMINI_API_KEY in Vercel Environment Variables " +
-                        "and redeploy.",
+                    code: "AI_SEARCH_UNAVAILABLE",
+                    error: "AI search is not available right now. Please use the filters.",
                 },
                 { status: 503 },
             );
@@ -989,12 +1058,19 @@ export async function POST(request) {
             },
         );
     } catch (error) {
-        console.error("[AI Search] Error:", error?.message || error);
+        console.error("[AI Search] Error:", error?.code || error?.message || error);
+
+        if (error?.code === "AI_DAILY_LIMIT") {
+            return aiSearchError(
+                "AI search is busy right now. Please use the filters or try again later.",
+                503,
+            );
+        }
 
         return NextResponse.json(
             {
                 success: false,
-                error: error?.message || "AI search failed. Please try again.",
+                error: "AI search failed. Please try again.",
             },
             {
                 status: 500,

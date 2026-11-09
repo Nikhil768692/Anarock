@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
+import { getOrFetchCache } from "@/lib/cache";
+import { createRateLimiter } from "@/lib/requestGuard";
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 const CRM_API_DOMAIN = "https://www.zohoapis.in";
 const CITY_MODULE = "City";
 const MICROMARKET_MODULE = "Micromarkets";
 const MICROMARKET_CITY_FIELD = "City";
+
+// City and micro-market lists change rarely, so CRM is read at most once
+// every 30 minutes instead of on every request.
+const OPTIONS_CACHE_TTL = 30 * 60 * 1000;
+const TOKEN_CACHE_KEY = "__anarockListPropertyZohoToken";
+
+const checkOptionsRateLimit = createRateLimiter({
+    name: "LIST_PROPERTY_OPTIONS",
+    windowMs: 60 * 1000,
+    max: 30,
+});
 function escapeHtml(value = "") {
     return String(value)
         .replace(/&/g, "&amp;")
@@ -76,6 +89,10 @@ async function getZohoAccessToken() {
     if (process.env.ZOHO_CRM_ACCESS_TOKEN) {
         return process.env.ZOHO_CRM_ACCESS_TOKEN;
     }
+    const cachedToken = globalThis[TOKEN_CACHE_KEY];
+    if (cachedToken?.accessToken && cachedToken.expiresAt > Date.now()) {
+        return cachedToken.accessToken;
+    }
     const {
         ZOHO_CRM_REFRESH_TOKEN,
         ZOHO_CRM_CLIENT_ID,
@@ -100,19 +117,25 @@ async function getZohoAccessToken() {
         grant_type: "refresh_token",
     });
 
-    const response = await fetch(
-        `${accountsDomain}/oauth/v2/token?${params.toString()}`,
-        {
-            method: "POST",
-            cache: "no-store",
+    const response = await fetch(`${accountsDomain}/oauth/v2/token`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
         },
-    );
+        body: params.toString(),
+        cache: "no-store",
+    });
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.access_token) {
-        console.error("Zoho token error:", data);
+        console.error("Zoho token error:", data?.error || response.status);
         throw new Error("Unable to authenticate with Zoho CRM.");
     }
+    const expiresInSeconds = Number(data.expires_in) || 3600;
+    globalThis[TOKEN_CACHE_KEY] = {
+        accessToken: data.access_token,
+        expiresAt: Date.now() + Math.max(60, expiresInSeconds - 300) * 1000,
+    };
     return data.access_token;
 }
 async function getCRMRecords(moduleName) {
@@ -147,10 +170,11 @@ async function getCRMRecords(moduleName) {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            console.error("Zoho CRM error:", data);
-            throw new Error(
-                data?.message || `Unable to fetch ${moduleName} from CRM.`,
-            );
+            console.error("Zoho CRM error:", data?.code || response.status);
+            if (response.status === 401) {
+                globalThis[TOKEN_CACHE_KEY] = null;
+            }
+            throw new Error(`Unable to fetch ${moduleName} from CRM.`);
         }
         const current = Array.isArray(data?.data) ? data.data : [];
         records.push(...current);
@@ -162,8 +186,17 @@ async function getCRMRecords(moduleName) {
     return records;
 }
 
+function getCachedCRMRecords(moduleName) {
+    return getOrFetchCache(
+        `list-your-property:${moduleName}`,
+        () => getCRMRecords(moduleName),
+        OPTIONS_CACHE_TTL,
+        { staleWhileRevalidate: true },
+    );
+}
+
 async function getCities() {
-    const records = await getCRMRecords(CITY_MODULE);
+    const records = await getCachedCRMRecords(CITY_MODULE);
     return uniqueValues(records.map(getRecordName));
 }
 
@@ -171,12 +204,27 @@ async function getMicromarkets(city) {
     if (!city) {
         return [];
     }
-    const records = await getCRMRecords(MICROMARKET_MODULE);
+    const records = await getCachedCRMRecords(MICROMARKET_MODULE);
     const filtered = records.filter((record) => matchesCity(record, city));
     return uniqueValues(filtered.map(getRecordName));
 }
 
 export async function GET(request) {
+    const rateLimit = checkOptionsRateLimit(request);
+
+    if (!rateLimit.allowed) {
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Too many requests. Please try again in a minute.",
+            },
+            {
+                status: 429,
+                headers: { "Retry-After": String(rateLimit.retryAfter) },
+            },
+        );
+    }
+
     try {
         const url = new URL(request.url);
         const resource = url.searchParams.get("resource");
@@ -189,7 +237,7 @@ export async function GET(request) {
         }
 
         if (resource === "micromarkets") {
-            const city = url.searchParams.get("city")?.trim();
+            const city = url.searchParams.get("city")?.trim().slice(0, 100);
 
             if (!city) {
                 return NextResponse.json({
@@ -218,15 +266,12 @@ export async function GET(request) {
             },
         );
     } catch (error) {
-        console.error("Listing options error:", error);
+        console.error("Listing options error:", error?.message || error);
 
         return NextResponse.json(
             {
                 success: false,
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : "Unable to load CRM options.",
+                message: "Unable to load CRM options.",
             },
             {
                 status: 500,
@@ -608,9 +653,6 @@ export async function POST(request) {
             callbackTime,
             form,
         };
-
-        // Visible in the browser's console after the frontend logs it.
-        console.log("Property form response:", response);
 
         // Return the response to the frontend.
         return NextResponse.json(response, { status: 200 });

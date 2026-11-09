@@ -150,7 +150,7 @@ export async function GET() {
     return NextResponse.json(
       {
         success: false,
-        error: error?.message || "Failed to fetch market stats",
+        error: "Failed to fetch market stats",
       },
       {
         status: 502,

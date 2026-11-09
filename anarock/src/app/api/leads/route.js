@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
+import { getClientIp } from "@/lib/requestGuard";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const ACCOUNTS_URL = "https://accounts.zoho.in";
@@ -116,16 +117,7 @@ globalThis.__ANAROCK_LEADS_RATE_LIMIT = localRateLimitState;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 10;
 function getClientIdentifier(request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0].trim().slice(0, 100);
-  }
-
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) {
-    return realIp.trim().slice(0, 100);
-  }
-  return "unknown";
+  return getClientIp(request);
 }
 
 function checkRateLimit(request) {

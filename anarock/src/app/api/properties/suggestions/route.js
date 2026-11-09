@@ -114,8 +114,6 @@ function getPropertyPrice(property) {
 }
 
 function getCoordinates(property) {
-    console.log("PARTH");
-    console.log(property);
     const lat = parseNumber(
         getFirstValue(property, [
             "Latitude",
@@ -488,7 +486,7 @@ export async function GET(request) {
                 hasMore: false,
                 filteredResultCount: 0,
                 suggestionPoolCount: 0,
-                error: error?.message || "Failed to fetch suggested properties",
+                error: "Failed to fetch suggested properties",
             },
             {
                 status: 500,
