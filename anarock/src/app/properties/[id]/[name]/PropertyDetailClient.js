@@ -164,7 +164,7 @@ export default function PropertyDetailClient({ propertyId }) {
   const [related, setRelated] = useState([]);
   const [activeImg, setActiveImg] = useState("project");
   const [failedImages, setFailedImages] = useState(() => new Set());
-  const { unit, currency } = usePreferences();
+  const { unit, currency, exchangeRates } = usePreferences();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -961,7 +961,7 @@ export default function PropertyDetailClient({ propertyId }) {
                     label="Seat Price"
                     value={
                       propertyDetails.seatPrice !== "-"
-                        ? formatPrice(propertyDetails.seatPrice, currency)
+                        ? formatPrice(propertyDetails.seatPrice, currency, exchangeRates)
                         : "-"
                     }
                     icon={Layers3}
@@ -988,7 +988,7 @@ export default function PropertyDetailClient({ propertyId }) {
                     label="Rent"
                     value={
                       propertyDetails.quotedRent !== "-"
-                        ? formatPrice(propertyDetails.quotedRent, currency)
+                        ? formatPrice(propertyDetails.quotedRent, currency, exchangeRates)
                         : "-"
                     }
                     icon={CalendarDays}

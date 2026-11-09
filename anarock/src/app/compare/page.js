@@ -50,6 +50,8 @@ function DynamicPropertyImage({ folder, alt, priority, className }) {
     <Image
       src={currentUrl}
       alt={alt}
+      fill
+      sizes="(max-width: 768px) 100vw, 33vw"
       className={className}
       onError={() => {
         if (extIndex < extensions.length - 1) {

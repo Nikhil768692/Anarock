@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const ALLOWED_CURRENCIES = ["INR", "AED", "USD", "EUR", "SGD"];
-const CACHE_TTL = 60 * 60 * 1000;
+// Live rates are fetched from the provider once a day; every other request
+// uses the cached rates.
+const CACHE_TTL = 24 * 60 * 60 * 1000;
 const CACHE_KEY = "__anarockInrExchangeRates";
 function getCache() {
   if (!globalThis[CACHE_KEY]) {
