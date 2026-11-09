@@ -14,7 +14,7 @@ import {
   Filter,
   Check,
 } from "lucide-react";
-import { formatArea } from "@/lib/format";
+import { convertRentPerArea, formatArea } from "@/lib/format";
 import { usePreferences } from "@/lib/preferences";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import { useWishlist } from "@/lib/wishlist";
@@ -35,6 +35,9 @@ function DynamicPropertyImage({ folder, alt, priority, className }) {
   const extensions = [".jpg", ".png", ".jpeg", ".webp"];
   const [extIndex, setExtIndex] = useState(0);
   const [hasError, setHasError] = useState(false);
+  // After a failure through the image optimizer, the same file is retried
+  // directly from Stratus before moving to the next file extension.
+  const [direct, setDirect] = useState(false);
 
   if (!folder || hasError) {
     return (
@@ -52,9 +55,13 @@ function DynamicPropertyImage({ folder, alt, priority, className }) {
       alt={alt}
       fill
       sizes="(max-width: 768px) 100vw, 33vw"
+      unoptimized={direct}
       className={className}
       onError={() => {
-        if (extIndex < extensions.length - 1) {
+        if (!direct) {
+          setDirect(true);
+        } else if (extIndex < extensions.length - 1) {
+          setDirect(false);
           setExtIndex((prev) => prev + 1);
         } else {
           setHasError(true);
@@ -377,11 +384,18 @@ export default function ComparePage() {
       },
     },
     {
-      label: `Rent (${currency || "INR"})`,
+      label: `Rent (${currency || "INR"} / ${unit === "sqm" ? "sq m" : "sq ft"} / month)`,
       show: !allAreCoworking,
       value: (property) => {
         if (!isConventional(property)) return "-";
-        return renderCurrencyValue(property?.quotedRent);
+        // Rent is stored per sq ft per month; show it per the selected unit.
+        const rentPerSqft = Number(
+          String(property?.quotedRent ?? "").replace(/[^0-9.-]/g, ""),
+        );
+        if (!property?.quotedRent || !Number.isFinite(rentPerSqft)) {
+          return renderCurrencyValue(property?.quotedRent);
+        }
+        return renderCurrencyValue(convertRentPerArea(rentPerSqft, "sqft", unit));
       },
     },
     {

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePreferences } from "@/lib/preferences";
-import { formatArea, formatPrice } from "@/lib/format";
+import { convertRentPerArea, formatArea, formatPrice } from "@/lib/format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -164,6 +164,9 @@ export default function PropertyDetailClient({ propertyId }) {
   const [related, setRelated] = useState([]);
   const [activeImg, setActiveImg] = useState("project");
   const [failedImages, setFailedImages] = useState(() => new Set());
+  // Images that failed through the image optimizer and are retried by
+  // loading the original file directly from Stratus.
+  const [directImages, setDirectImages] = useState(() => new Set());
   const { unit, currency, exchangeRates } = usePreferences();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -235,6 +238,7 @@ export default function PropertyDetailClient({ propertyId }) {
         setProperty({ ...propertyData, image: primaryImage?.url || "" });
         setGallery(images);
         setFailedImages(new Set());
+        setDirectImages(new Set());
         setActiveImg(primaryImage?.key || "");
 
         try {
@@ -510,6 +514,20 @@ export default function PropertyDetailClient({ propertyId }) {
   }, [availableGallery, activeImg]);
 
   const handleImageError = useCallback((imageKey) => {
+    if (!imageKey) return;
+
+    // First failure: retry the same image directly from Stratus.
+    if (!directImages.has(imageKey)) {
+      setDirectImages((previous) => {
+        if (previous.has(imageKey)) return previous;
+        const next = new Set(previous);
+        next.add(imageKey);
+        return next;
+      });
+      return;
+    }
+
+    // Second failure: hide the image.
     setFailedImages((previous) => {
       if (previous.has(imageKey)) return previous;
 
@@ -517,7 +535,7 @@ export default function PropertyDetailClient({ propertyId }) {
       next.add(imageKey);
       return next;
     });
-  }, []);
+  }, [directImages]);
   const scrollThumbnailToTop = useCallback((imageKey) => {
     const container = thumbnailContainerRef.current;
     const thumbnail = thumbnailRefs.current[imageKey];
@@ -814,7 +832,8 @@ export default function PropertyDetailClient({ propertyId }) {
                         quality={90}
                         className="object-cover transition-opacity duration-200"
                         sizes="(max-width: 767px) 100vw, (max-width: 1199px) 65vw, 70vw"
-                        onError={() => handleImageError(activeImg)}
+                        unoptimized={directImages.has(activeImageItem?.key)}
+                        onError={() => handleImageError(activeImageItem?.key)}
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center text-xs text-slate-400">
@@ -886,6 +905,7 @@ export default function PropertyDetailClient({ propertyId }) {
                               fill
                               className="object-cover"
                               sizes="320px"
+                              unoptimized={directImages.has(image.key)}
                               onError={() => handleImageError(image.key)}
                             />
                             <div
@@ -928,6 +948,7 @@ export default function PropertyDetailClient({ propertyId }) {
                               fill
                               className="object-cover"
                               sizes="96px"
+                              unoptimized={directImages.has(image.key)}
                               onError={() => handleImageError(image.key)}
                             />
                             {isActive && (
@@ -985,10 +1006,14 @@ export default function PropertyDetailClient({ propertyId }) {
                     icon={CalendarDays}
                   />
                   <DetailField
-                    label="Rent"
+                    label={`Rent (per ${unit === "sqm" ? "sq m" : "sq ft"} / month)`}
                     value={
                       propertyDetails.quotedRent !== "-"
-                        ? formatPrice(propertyDetails.quotedRent, currency, exchangeRates)
+                        ? formatPrice(
+                          convertRentPerArea(propertyDetails.quotedRent, "sqft", unit),
+                          currency,
+                          exchangeRates,
+                        )
                         : "-"
                     }
                     icon={CalendarDays}

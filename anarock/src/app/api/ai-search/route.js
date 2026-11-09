@@ -733,17 +733,24 @@ function hardFilter(properties, body, extraction) {
 
     const suppliedType = str(body.propertyType || body.type);
 
+    // After the first AI reply, the page copies the understood filters into
+    // the web address (aiResolved=1). From then on the values sent by the page
+    // are final, so a filter the visitor removed is not added back from the
+    // AI reading of the query.
+    const useExtraction = !str(body.aiResolved);
+    const fromAi = (value) => (useExtraction ? value : null);
+
     const type =
         suppliedType && normalizeType(suppliedType)
             ? suppliedType
-            : extraction.type;
+            : fromAi(extraction.type) || "";
 
-    const minArea = num(body.area) ?? extraction.minArea;
-    const maxArea = num(body.maxArea) ?? extraction.maxArea;
-    const minSeats = num(body.seats) ?? extraction.minSeats;
-    const maxSeats = num(body.maxSeats) ?? extraction.maxSeats;
-    const minPrice = num(body.minBudget) ?? extraction.minPrice;
-    const maxPrice = num(body.maxBudget) ?? extraction.maxPrice;
+    const minArea = num(body.area) ?? fromAi(extraction.minArea);
+    const maxArea = num(body.maxArea) ?? fromAi(extraction.maxArea);
+    const minSeats = num(body.seats) ?? fromAi(extraction.minSeats);
+    const maxSeats = num(body.maxSeats) ?? fromAi(extraction.maxSeats);
+    const minPrice = num(body.minBudget) ?? fromAi(extraction.minPrice);
+    const maxPrice = num(body.maxBudget) ?? fromAi(extraction.maxPrice);
 
     const diagnostics = {
         total: Array.isArray(properties) ? properties.length : 0,

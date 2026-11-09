@@ -15,7 +15,7 @@ import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PropertyCard from "@/components/properties/PropertyCard";
 import { usePreferences } from "@/lib/preferences";
 import { useWishlist } from "@/lib/wishlist";
-import { convertCurrency, convertArea } from "@/lib/format";
+import { convertCurrency, convertArea, convertRentPerArea } from "@/lib/format";
 import {
   Sparkles,
   SlidersHorizontal,
@@ -320,6 +320,9 @@ function PropertiesClientContent() {
   const [isEnquiryOpen, setIsEnquiryOpen] = useState(false);
   const [enquirySelection, setEnquirySelection] = useState([]);
   const [compareSelection, setCompareSelection] = useState([]);
+  // Shown for a few seconds when a 4th property is ticked for comparison.
+  const [compareLimitNotice, setCompareLimitNotice] = useState(false);
+  const compareSelectionRef = useRef([]);
   const [suggestedProperties, setSuggestedProperties] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [properties, setProperties] = useState([]);
@@ -753,9 +756,27 @@ function PropertiesClientContent() {
     [toggleWishlist],
   );
 
+  useEffect(() => {
+    compareSelectionRef.current = compareSelection;
+  }, [compareSelection]);
+
+  useEffect(() => {
+    if (!compareLimitNotice) return undefined;
+    const timer = setTimeout(() => setCompareLimitNotice(false), 4000);
+    return () => clearTimeout(timer);
+  }, [compareLimitNotice]);
+
   const handleCompareToggle = useCallback((property) => {
     const id = getPropertyId(property);
     if (!id) return;
+
+    const current = compareSelectionRef.current;
+    const isSelected = current.some((item) => getPropertyId(item) === id);
+    if (!isSelected && current.length >= MAX_COMPARE_PROPERTIES) {
+      setCompareLimitNotice(true);
+      return;
+    }
+    setCompareLimitNotice(false);
 
     setCompareSelection((prev) => {
       const alreadySelected = prev.some((item) => getPropertyId(item) === id);
@@ -925,8 +946,13 @@ function PropertiesClientContent() {
           const amount = Number(value);
           if (!Number.isFinite(amount)) return;
 
+          // Rent is typed per the selected area unit; the API expects per sq ft.
+          const perSqft = isCoworking
+            ? amount
+            : convertRentPerArea(amount, filters.areaUnit, "sqft");
+
           const converted = convertCurrency(
-            amount,
+            perSqft,
             filters.currency,
             "INR",
             exchangeRates,
@@ -999,6 +1025,7 @@ function PropertiesClientContent() {
               ...Object.fromEntries(params.entries()),
               mode: "ai",
               prompt,
+              ...(searchParams.has("aiResolved") ? { aiResolved: "1" } : {}),
               ...(aiConfirmedCity ? { confirmedCity: aiConfirmedCity } : {}),
             }),
             cache: "no-store",
@@ -1364,12 +1391,16 @@ function PropertiesClientContent() {
 
       const toINR = (value) => {
         const amount = Number(value);
+        // Rent is typed per the selected area unit; the API expects per sq ft.
+        const perSqft = isCoworking
+          ? amount
+          : convertRentPerArea(amount, filters.areaUnit, "sqft");
 
         return Number.isFinite(amount)
           ? String(
             Math.round(
               convertCurrency(
-                amount,
+                perSqft,
                 filters.currency,
                 "INR",
                 exchangeRates
@@ -1555,13 +1586,18 @@ function PropertiesClientContent() {
           }
         };
 
-        addConverted("minBudget", filters.minBudget, (v) =>
-          convertCurrency(v, filters.currency, "INR", exchangeRates)
-        );
+        // Rent is typed per the selected area unit; the API expects per sq ft.
+        const budgetToINR = (v) =>
+          convertCurrency(
+            isCoworking ? v : convertRentPerArea(v, filters.areaUnit, "sqft"),
+            filters.currency,
+            "INR",
+            exchangeRates
+          );
 
-        addConverted("maxBudget", filters.maxBudget, (v) =>
-          convertCurrency(v, filters.currency, "INR", exchangeRates)
-        );
+        addConverted("minBudget", filters.minBudget, budgetToINR);
+
+        addConverted("maxBudget", filters.maxBudget, budgetToINR);
 
         if (!isCoworking) {
           addConverted("area", filters.area, (v) =>
@@ -1903,18 +1939,34 @@ function PropertiesClientContent() {
     filters.minBudget !== "" && {
       label: `Min ${isCoworking ? "Seat Price" : "Rent"}: ${currencySymbol}${formatRawNumber(
         filters.minBudget,
-      )}`,
+      )}${isCoworking ? "" : ` / ${areaUnitLabel}`}`,
       key: "minBudget",
+    },
+    filters.maxBudget !== "" && {
+      label: `Max ${isCoworking ? "Seat Price" : "Rent"}: ${currencySymbol}${formatRawNumber(
+        filters.maxBudget,
+      )}${isCoworking ? "" : ` / ${areaUnitLabel}`}`,
+      key: "maxBudget",
     },
     !isCoworking &&
     filters.area !== "" && {
       label: `Min Area: ${formatRawNumber(filters.area)} ${areaUnitLabel}`,
       key: "area",
     },
+    !isCoworking &&
+    filters.maxArea !== "" && {
+      label: `Max Area: ${formatRawNumber(filters.maxArea)} ${areaUnitLabel}`,
+      key: "maxArea",
+    },
     isCoworking &&
     filters.seats !== "" && {
       label: `Seats: ${formatRawNumber(filters.seats)}`,
       key: "seats",
+    },
+    isCoworking &&
+    filters.maxSeats !== "" && {
+      label: `Max Seats: ${formatRawNumber(filters.maxSeats)}`,
+      key: "maxSeats",
     },
     filters.prompt && {
       label: `AI: ${filters.prompt.slice(0, 30)}${filters.prompt.length > 30 ? "..." : ""
@@ -2412,7 +2464,7 @@ function PropertiesClientContent() {
                     <>
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Min Rent / month ({filters.currency})
+                          Min Rent / {areaUnitLabel} / month ({filters.currency})
                         </label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center">
@@ -2791,8 +2843,8 @@ function PropertiesClientContent() {
       )}
 
       {showSelectionBar && (
-        <div className="fixed bottom-4 left-1/2 z-[90] w-[calc(100%-1.5rem)] max-w-5xl -translate-x-1/2 rounded-xl border border-slate-400/80 bg-white/95 p-4 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:w-[calc(100%-2.5rem)] sm:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="fixed bottom-3 left-1/2 z-[90] w-[calc(100%-1.5rem)] max-w-5xl -translate-x-1/2 rounded-xl border border-slate-400/80 bg-white/95 p-3 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:w-[calc(100%-2.5rem)] sm:p-5">
+          <div className="flex flex-col gap-2.5 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
             {" "}
             <div className="min-w-0 flex-1">
               {compareSelection.length > 0 ? (
@@ -2805,7 +2857,16 @@ function PropertiesClientContent() {
                     </p>
                   </div>
 
-                  <p className="mt-1 pl-7 text-xs leading-5 text-slate-500 sm:text-sm">
+                  {compareLimitNotice ? (
+                    <p
+                      role="status"
+                      className="mt-1 pl-7 text-xs font-semibold leading-5 text-[#A054A0] sm:text-sm"
+                    >
+                      You can compare up to {MAX_COMPARE_PROPERTIES} properties.
+                      Remove one to add another.
+                    </p>
+                  ) : (
+                  <p className="mt-1 hidden pl-7 text-xs leading-5 text-slate-500 sm:block sm:text-sm">
                     {canCompare
                       ? "Ready to compare side-by-side."
                       : `Select ${remainingToCompare === 1
@@ -2813,6 +2874,7 @@ function PropertiesClientContent() {
                         : "at least two properties"
                       } to compare.`}
                   </p>
+                  )}
                 </>
               ) : (
                 <>
@@ -2824,18 +2886,21 @@ function PropertiesClientContent() {
                     </p>
                   </div>
 
-                  <p className="mt-1 pl-7 text-xs leading-5 text-slate-500 sm:text-sm">
+                  <p className="mt-1 hidden pl-7 text-xs leading-5 text-slate-500 sm:block sm:text-sm">
                     Select properties to compare or raise a unified enquiry.
                   </p>
                 </>
               )}
             </div>
-            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-start lg:w-auto lg:shrink-0 lg:justify-end">
+            <div
+              className={`grid w-full gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-start lg:w-auto lg:shrink-0 lg:justify-end ${compareSelection.length > 0 ? "grid-cols-3" : "grid-cols-2"
+                }`}
+            >
               <button
                 type="button"
                 onClick={openComparePage}
                 disabled={!canCompare}
-                className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#A054A0] px-3 py-2.5 text-xs font-bold text-white shadow-sm transition-all duration-200 hover:bg-[#864286] hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm sm:px-4 sm:text-sm"
+                className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-[#A054A0] px-2 py-2 text-xs sm:min-h-11 sm:gap-2 sm:py-2.5 font-bold text-white shadow-sm transition-all duration-200 hover:bg-[#864286] hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm sm:px-4 sm:text-sm"
               >
                 <GitCompare className="h-4 w-4 shrink-0" />
                 <span>Compare</span>
@@ -2850,7 +2915,7 @@ function PropertiesClientContent() {
                 type="button"
                 onClick={openEnquiryForm}
                 disabled={wishlistIds.length === 0}
-                className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#A054A0] bg-white px-3 py-2.5 text-xs font-bold text-[#A054A0] shadow-sm transition-all duration-200 hover:bg-[#A054A0]/10 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
+                className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-[#A054A0] bg-white px-2 py-2 text-xs sm:min-h-11 sm:gap-2 sm:py-2.5 font-bold text-[#A054A0] shadow-sm transition-all duration-200 hover:bg-[#A054A0]/10 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
               >
                 <MessageSquare className="h-4 w-4 shrink-0" />
                 <span>Raise Enquiry</span>
@@ -2860,7 +2925,7 @@ function PropertiesClientContent() {
                 <button
                   type="button"
                   onClick={clearCompareSelection}
-                  className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-500 bg-white px-4 py-2.5 text-xs font-semibold text-black/80 transition-all duration-200 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] sm:col-span-1 sm:text-sm"
+                  className="inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-500 bg-white px-2 py-2 text-xs font-semibold text-black/80 transition-all duration-200 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
                 >
                   <X className="h-4 w-4 shrink-0" />
                   <span>Clear</span>

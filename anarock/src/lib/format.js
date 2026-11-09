@@ -67,6 +67,27 @@ export function convertArea(amount, fromUnit = "sqft", toUnit = "sqft") {
   }
   return numericAmount;
 }
+// Rent is stored per sq ft per month. This converts a rent value from
+// "per one area unit" to "per another area unit" (1 sq m = 10.764 sq ft).
+export function convertRentPerArea(amount, fromUnit = "sqft", toUnit = "sqft") {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) {
+    return 0;
+  }
+  const from = String(fromUnit).toLowerCase();
+  const to = String(toUnit).toLowerCase();
+  if (from === to) {
+    return numericAmount;
+  }
+  if (from === "sqft" && to === "sqm") {
+    return numericAmount / 0.09290304;
+  }
+  if (from === "sqm" && to === "sqft") {
+    return numericAmount * 0.09290304;
+  }
+  return numericAmount;
+}
+
 export function formatPrice(priceINR, currency = "INR", exchangeRates = {}) {
   const numericPrice = Number(priceINR);
 
