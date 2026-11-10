@@ -953,23 +953,35 @@ export async function POST(request) {
 
         let extraction = initialExtraction;
         const confirmedCity = str(body.confirmedCity);
+        const confirmedMicromarket = str(body.confirmedMicromarket);
         const promptCity = detectExplicitCity(prompt, properties);
-        const requestedCity = confirmedCity || promptCity || extraction.city;
-        const canonicalCity = requestedCity
-            ? resolveCanonicalCity(properties, requestedCity)
-            : "";
-        if (canonicalCity) {
+
+        // The visitor picked one exact micro-market from the choices.
+        if (confirmedMicromarket) {
             extraction = {
                 ...extraction,
-                city: canonicalCity,
+                micromarket: confirmedMicromarket,
             };
         }
 
-        if (!canonicalCity && extraction.micromarket) {
-            const marketMatches = findMarketMatches(
+        // Ask which micro-market is meant when the name has listed properties
+        // in more than one city and the visitor did not name a city. A city guessed by the
+        // AI is not enough, because the guess can be wrong.
+        const explicitCity = confirmedCity || promptCity;
+        if (!explicitCity && !str(body.aiResolved) && extraction.micromarket) {
+            let marketMatches = findMarketMatches(
                 properties,
                 extraction.micromarket,
             );
+            // An exact name (for example "CBD - PUN") needs no question.
+            const exactMatches = marketMatches.filter(
+                (match) =>
+                    locationNorm(match.micromarket) ===
+                    locationNorm(extraction.micromarket),
+            );
+            if (exactMatches.length > 0) {
+                marketMatches = exactMatches;
+            }
             const citiesByKey = new Map();
             for (const match of marketMatches) {
                 if (match.city) {
@@ -983,11 +995,18 @@ export async function POST(request) {
                         success: true,
                         needsClarification: true,
                         clarification: {
-                            type: "city",
-                            title: "Which city do you want to search in?",
-                            message: `We found "${extraction.micromarket}" in more than one city.`,
+                            type: "micromarket",
+                            title: "Which micro-market do you mean?",
+                            message: `"${extraction.micromarket}" is in more than one city.`,
                             originalQuery: prompt,
                             micromarket: extraction.micromarket,
+                            // One choice per micro-market and city.
+                            choices: marketMatches
+                                .filter((match) => match.city && match.micromarket)
+                                .map((match) => ({
+                                    city: match.city,
+                                    micromarket: match.micromarket,
+                                })),
                             options: matchingCities.map((city) => ({
                                 city,
                                 micromarkets: [
@@ -1016,6 +1035,20 @@ export async function POST(request) {
                     city: matchingCities[0],
                 };
             }
+        }
+
+        const requestedCity = explicitCity || extraction.city;
+        // A city the visitor picked is kept even when it has no listed
+        // property yet, so the page shows "no results" for that city instead
+        // of falling back to the AI's guess.
+        const canonicalCity = requestedCity
+            ? resolveCanonicalCity(properties, requestedCity) || confirmedCity
+            : "";
+        if (canonicalCity) {
+            extraction = {
+                ...extraction,
+                city: canonicalCity,
+            };
         }
 
         const effectiveCity = canonicalCity || extraction.city || "";

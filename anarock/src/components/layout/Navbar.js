@@ -744,7 +744,7 @@ export default function Navbar() {
     <>
       <header className="sticky inset-x-0 top-0 z-[100] w-full translate-y-0 opacity-100">
         <div className="relative mx-auto w-full overflow-visible border shadow-lg border-white/40 bg-transparent backdrop-blur-2xl">
-          <div className="flex h-[70px] min-h-[70px] w-full items-center justify-between gap-2 px-3 sm:h-[70px] sm:px-4 md:gap-3 md:px-5 lg:h-[85px] lg:px-3 min-[1366px]:h-[80px] min-[1366px]:gap-2 min-[1366px]:px-3 min-[1920px]:h-[80px] min-[1920px]:px-8">
+          <div className="flex h-[70px] min-h-[70px] w-full items-center justify-between gap-2 px-3 sm:h-[70px] sm:px-4 md:gap-3 md:px-5 lg:h-[85px] lg:px-3 min-[1280px]:h-[80px] min-[1280px]:gap-2 min-[1280px]:px-3 min-[1920px]:h-[80px] min-[1920px]:px-8">
             <Link
               href="/"
               onClick={closeMenu}
@@ -757,7 +757,7 @@ export default function Navbar() {
                   alt="Anarock"
                   className="block h-auto w-[90px] object-contain transition-transform duration-300 group-hover:scale-105 sm:w-[102px] md:w-[112px] lg:w-[120px] min-[1280px]:w-[122px] min-[1920px]:w-[150px]"
                 />
-                <div className="flex min-w-0 max-w-[180px] items-center gap-1.5 bg-white/90 rounded-lg border border-black/15 px-2.5 py-1.5 shadow-sm backdrop-blur-sm transition-all duration-200 sm:max-w-[165px] sm:gap-2 sm:px-3 sm:py-2 md:max-w-[185px] lg:max-w-[250px] min-[1920px]:max-w-[260px] min-[1920px]:px-3.5 min-[1920px]:py-2.5">
+                <div className="flex min-w-0 max-w-[180px] items-center gap-1.5 bg-white/90 rounded-lg border border-black/15 px-2.5 py-1.5 shadow-sm backdrop-blur-sm transition-all duration-200 sm:max-w-[165px] sm:gap-2 sm:px-3 sm:py-2 md:max-w-[185px] lg:max-w-[250px] min-[1280px]:max-w-[175px] min-[1536px]:max-w-[250px] min-[1920px]:max-w-[260px] min-[1920px]:px-3.5 min-[1920px]:py-2.5">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#A054A0] text-white shadow-sm sm:h-7 sm:w-7 min-[1920px]:h-8 min-[1920px]:w-8">
                     <MapPin size={14} strokeWidth={2.3} />
                   </span>
@@ -778,7 +778,7 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="no-scrollbar mx-0 hidden min-w-0 items-center justify-center gap-1 overflow-visible rounded-lg border border-white/80 bg-white/90 px-4 py-1.5 shadow-sm backdrop-blur-md min-[1366px]:flex min-[1366px]:gap-1 min-[1920px]:gap-2 min-[1920px]:p-2">
+            <nav className="no-scrollbar mx-0 hidden min-w-0 items-center justify-center gap-1 overflow-visible rounded-lg border border-white/80 bg-white/90 px-4 py-1.5 shadow-sm backdrop-blur-md min-[1280px]:flex min-[1280px]:gap-0.5 min-[1280px]:px-2 min-[1366px]:gap-1 min-[1366px]:px-4 min-[1920px]:gap-2 min-[1920px]:p-2">
               {navigation.map((item) => {
                 if (item.type === "scroll") {
                   return (
@@ -786,10 +786,10 @@ export default function Navbar() {
                       key={item.label}
                       type="button"
                       onClick={() => handleScrollNavigation(item.href)}
-                      className="group relative cursor-pointer whitespace-nowrap rounded-lg border-0 bg-transparent px-3 py-1.5 text-[14px] font-semibold text-black transition-all duration-200 hover:text-[#A054A0] min-[1366px]:px-2.5 min-[1366px]:text-[13px] min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px]"
+                      className="group relative cursor-pointer whitespace-nowrap rounded-lg border-0 bg-transparent px-3 py-1.5 text-[14px] font-semibold text-black transition-all duration-200 hover:text-[#A054A0] min-[1280px]:px-2 min-[1280px]:text-[13px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px]"
                     >
                       <span>{item.label}</span>
-                      <span className="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-lg bg-[#A054A0] scale-x-0 transition-transform duration-200 group-hover:scale-x-100 min-[1366px]:left-2 min-[1366px]:right-2" />
+                      <span className="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-lg bg-[#A054A0] scale-x-0 transition-transform duration-200 group-hover:scale-x-100 min-[1280px]:left-2 min-[1280px]:right-2" />
                     </button>
                   );
                 }
@@ -807,7 +807,7 @@ export default function Navbar() {
                         type="button"
                         aria-expanded={servicesMenuOpen}
                         onClick={() => setServicesMenuOpen((prev) => !prev)}
-                        className={`group relative flex items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] font-semibold transition-all duration-200 min-[1366px]:px-2.5 min-[1366px]:text-[13px] min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px] ${servicesMenuOpen
+                        className={`group relative flex items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] font-semibold transition-all duration-200 min-[1280px]:px-2 min-[1280px]:text-[13px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px] ${servicesMenuOpen
                           ? "text-[#A054A0]"
                           : "text-black hover:text-[#A054A0]"
                           }`}
@@ -815,7 +815,7 @@ export default function Navbar() {
                         <span>{item.label}</span>
 
                         <span
-                          className={`absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-lg bg-[#A054A0] transition-transform duration-200 min-[1366px]:left-2 min-[1366px]:right-2 ${servicesMenuOpen
+                          className={`absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-lg bg-[#A054A0] transition-transform duration-200 min-[1280px]:left-2 min-[1280px]:right-2 ${servicesMenuOpen
                             ? "scale-x-100"
                             : "scale-x-0 group-hover:scale-x-100"
                             }`}
@@ -871,22 +871,22 @@ export default function Navbar() {
                     key={item.href}
                     href={item.href}
                     onClick={closeMenu}
-                    className="group relative whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] font-semibold text-black transition-all duration-200 hover:text-[#A054A0] min-[1366px]:px-2.5 min-[1366px]:text-[13px] min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px]"
+                    className="group relative whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] font-semibold text-black transition-all duration-200 hover:text-[#A054A0] min-[1280px]:px-2 min-[1280px]:text-[13px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px]"
                   >
                     <span>{item.label}</span>
-                    <span className="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-lg bg-[#A054A0] scale-x-0 transition-transform duration-200 group-hover:scale-x-100 min-[1366px]:left-2 min-[1366px]:right-2" />
+                    <span className="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-lg bg-[#A054A0] scale-x-0 transition-transform duration-200 group-hover:scale-x-100 min-[1280px]:left-2 min-[1280px]:right-2" />
                   </Link>
                 );
               })}
             </nav>
 
             <div>
-              <div className="ml-1 hidden shrink-0 items-center gap-1.5 min-[1366px]:flex min-[1366px]:gap-1.5 min-[1920px]:ml-3 min-[1920px]:gap-3">
+              <div className="ml-1 hidden shrink-0 items-center gap-1.5 min-[1280px]:flex min-[1280px]:gap-1.5 min-[1920px]:ml-3 min-[1920px]:gap-3">
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setCurrencyOpen((prev) => !prev)}
-                    className="flex h-9 items-center text-nowrap rounded-lg border border-[#A054A0]/20 bg-white/90 px-3 text-[12px] font-semibold text-black shadow-sm backdrop-blur-md transition-all duration-200 hover:border-[#A054A0] hover:bg-white hover:text-[#A054A0] active:scale-95 min-[1366px]:px-2.5 min-[1920px]:h-10 min-[1920px]:px-4 min-[1920px]:text-[13px]"
+                    className="flex h-9 items-center text-nowrap rounded-lg border border-[#A054A0]/20 bg-white/90 px-3 text-[12px] font-semibold text-black shadow-sm backdrop-blur-md transition-all duration-200 hover:border-[#A054A0] hover:bg-white hover:text-[#A054A0] active:scale-95 min-[1280px]:px-2.5 min-[1920px]:h-10 min-[1920px]:px-4 min-[1920px]:text-[13px]"
                   >
                     {currencyLabel}
 
@@ -923,7 +923,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => handleUnitSelect("sq.ft")}
-                    className={`relative z-10 rounded-lg px-2.5 py-1 text-[14px] font-bold transition-all duration-200 active:scale-95 min-[1366px]:px-2 min-[1366px]:text-[14px] min-[1920px]:px-4 min-[1920px]:py-1.5 min-[1920px]:text-[16px] ${unit === "sqft"
+                    className={`relative z-10 rounded-lg px-2.5 py-1 text-[14px] font-bold transition-all duration-200 active:scale-95 min-[1280px]:px-2 min-[1280px]:text-[14px] min-[1920px]:px-4 min-[1920px]:py-1.5 min-[1920px]:text-[16px] ${unit === "sqft"
                       ? "bg-[#A054A0] text-white shadow-sm"
                       : "text-black hover:bg-white/80 hover:text-[#A054A0]"
                       }`}
@@ -934,7 +934,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => handleUnitSelect("sq.m")}
-                    className={`relative z-10 rounded-lg px-2.5 py-1 text-[14px] font-bold transition-all duration-200 active:scale-95 min-[1366px]:px-2 min-[1366px]:text-[14px] min-[1920px]:px-4 min-[1920px]:py-1.5 min-[1920px]:text-[16px] ${unit === "sqm"
+                    className={`relative z-10 rounded-lg px-2.5 py-1 text-[14px] font-bold transition-all duration-200 active:scale-95 min-[1280px]:px-2 min-[1280px]:text-[14px] min-[1920px]:px-4 min-[1920px]:py-1.5 min-[1920px]:text-[16px] ${unit === "sqm"
                       ? "bg-[#A054A0] text-white shadow-sm"
                       : "text-black hover:bg-white/80 hover:text-[#A054A0]"
                       }`}
@@ -946,7 +946,7 @@ export default function Navbar() {
                 <button
                   type="button"
                   onClick={openEnquiry}
-                  className="group inline-flex h-9 items-center justify-between gap-2 rounded-lg bg-[#A054A0] px-4 text-[14px] font-semibold text-white shadow-md transition-all duration-200 ease-out hover:bg-[#8d478d] hover:shadow-lg active:scale-95 min-[1366px]:gap-1 min-[1366px]:px-3 min-[1366px]:text-[12px] min-[1920px]:h-10 min-[1920px]:px-5 min-[1920px]:text-[16px]"
+                  className="group inline-flex h-9 items-center justify-between gap-2 whitespace-nowrap rounded-lg bg-[#A054A0] px-4 text-[14px] font-semibold text-white shadow-md transition-all duration-200 ease-out hover:bg-[#8d478d] hover:shadow-lg active:scale-95 min-[1280px]:gap-1 min-[1280px]:px-3 min-[1280px]:text-[12px] min-[1920px]:h-10 min-[1920px]:px-5 min-[1920px]:text-[16px]"
                 >
                   <span className="relative z-10">Request Callback</span>
 
@@ -963,7 +963,7 @@ export default function Navbar() {
                     ? `, ${wishlistCount} saved properties`
                     : ""
                     }`}
-                  className="group relative hidden h-9 shrink-0 items-center gap-1 rounded-lg border border-[#A054A0]/20 bg-white/90 px-3 text-[14px] font-semibold text-black shadow-sm backdrop-blur-md transition-all duration-200 hover:border-[#A054A0] hover:bg-white hover:text-[#A054A0] active:scale-95 min-[1366px]:inline-flex min-[1366px]:px-2.5 min-[1920px]:h-10 min-[1920px]:px-4 min-[1920px]:text-[16px]"
+                  className="group relative hidden h-9 shrink-0 items-center gap-1 rounded-lg border border-[#A054A0]/20 bg-white/90 px-3 text-[14px] font-semibold text-black shadow-sm backdrop-blur-md transition-all duration-200 hover:border-[#A054A0] hover:bg-white hover:text-[#A054A0] active:scale-95 min-[1280px]:inline-flex min-[1280px]:px-2.5 min-[1920px]:h-10 min-[1920px]:px-4 min-[1920px]:text-[16px]"
                 >
                   <Heart
                     size={16}
@@ -987,7 +987,7 @@ export default function Navbar() {
                 onClick={() => setMobileOpen((prev) => !prev)}
                 aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
                 aria-expanded={mobileOpen}
-                className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#A054A0]/20 bg-white/70 text-black shadow-sm backdrop-blur-md transition-all duration-200 hover:border-[#A054A0] hover:bg-white hover:text-[#A054A0] active:scale-90 sm:h-10 sm:w-10 min-[1366px]:hidden"
+                className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#A054A0]/20 bg-white/70 text-black shadow-sm backdrop-blur-md transition-all duration-200 hover:border-[#A054A0] hover:bg-white hover:text-[#A054A0] active:scale-90 sm:h-10 sm:w-10 min-[1280px]:hidden"
               >
                 {mobileOpen ? (
                   <X size={18} strokeWidth={2} className="text-[#A054A0]" />
@@ -999,7 +999,7 @@ export default function Navbar() {
           </div>
 
           <div
-            className={`overflow-hidden border-t border-[#A054A0]/15 bg-white/95 backdrop-blur-2xl transition-all duration-300 ease-in-out min-[1366px]:hidden ${mobileOpen
+            className={`overflow-hidden border-t border-[#A054A0]/15 bg-white/95 backdrop-blur-2xl transition-all duration-300 ease-in-out min-[1280px]:hidden ${mobileOpen
               ? "pointer-events-auto max-h-[calc(100dvh-100px)] rounded-b-xl opacity-100 shadow-xl"
               : "pointer-events-none max-h-0 opacity-0"
               }`}

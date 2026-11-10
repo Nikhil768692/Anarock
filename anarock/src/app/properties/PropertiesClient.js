@@ -344,6 +344,7 @@ function PropertiesClientContent() {
   const [appliedAiPrompt, setAppliedAiPrompt] = useState("");
   const [aiClarification, setAiClarification] = useState(null);
   const [aiConfirmedCity, setAiConfirmedCity] = useState("");
+  const [aiConfirmedMicromarket, setAiConfirmedMicromarket] = useState("");
   const hasShortlistedProperties = wishlistIds.length > 0;
   const hasComparedProperties = compareSelection.length > 0;
   const showSelectionBar = hasShortlistedProperties || hasComparedProperties;
@@ -422,6 +423,7 @@ function PropertiesClientContent() {
     params.set("prompt", prompt);
 
     setAiConfirmedCity("");
+    setAiConfirmedMicromarket("");
     setAiClarification(null);
     setError("");
     setAppliedAiPrompt(prompt);
@@ -441,10 +443,11 @@ function PropertiesClientContent() {
     router.push(`/properties?${params.toString()}`, { scroll: false });
   };
 
-  const handleConfirmAiCity = (city) => {
+  const handleConfirmAiCity = (city, micromarket = "") => {
     const selectedCity = String(city || "").trim();
     if (!selectedCity) return;
     setAiConfirmedCity(selectedCity);
+    setAiConfirmedMicromarket(String(micromarket || "").trim());
     setAiClarification(null);
     setError("");
     setProperties([]);
@@ -1027,6 +1030,9 @@ function PropertiesClientContent() {
               prompt,
               ...(searchParams.has("aiResolved") ? { aiResolved: "1" } : {}),
               ...(aiConfirmedCity ? { confirmedCity: aiConfirmedCity } : {}),
+              ...(aiConfirmedMicromarket
+                ? { confirmedMicromarket: aiConfirmedMicromarket }
+                : {}),
             }),
             cache: "no-store",
             signal: controller.signal,
@@ -1173,6 +1179,7 @@ function PropertiesClientContent() {
     router,
     searchParams,
     aiConfirmedCity,
+    aiConfirmedMicromarket,
   ]);
 
   // useEffect(() => {
@@ -2113,6 +2120,69 @@ function PropertiesClientContent() {
             </form>
           </div>
 
+          {/* Shown in the page (not as a pop-up) when the searched
+              micro-market name exists in more than one city. */}
+          {aiClarification && (
+            <section
+              aria-live="polite"
+              aria-labelledby="ai-micromarket-question"
+              className="rounded-xl border border-[#A054A0]/20 bg-white p-4 shadow-[0_10px_30px_-15px_rgba(160,84,160,0.12)] lg:ml-auto lg:max-w-xl"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p
+                    id="ai-micromarket-question"
+                    className="text-sm font-semibold text-slate-900"
+                  >
+                    {aiClarification.title || "Which micro-market do you mean?"}
+                  </p>
+                  {aiClarification.message && (
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {aiClarification.message}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiClarification(null)}
+                  aria-label="Close micro-market question"
+                  className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(Array.isArray(aiClarification.choices) &&
+                  aiClarification.choices.length > 0
+                  ? aiClarification.choices
+                  : (aiClarification.options || []).map((option) => ({
+                    city:
+                      typeof option === "string"
+                        ? option
+                        : String(option?.city || "").trim(),
+                    micromarket: "",
+                  }))
+                ).map((choice) => {
+                  const city = String(choice?.city || "").trim();
+                  const micromarket = String(choice?.micromarket || "").trim();
+                  if (!city) return null;
+
+                  return (
+                    <button
+                      key={`${city}::${micromarket}`}
+                      type="button"
+                      onClick={() => handleConfirmAiCity(city, micromarket)}
+                      className="rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-800 transition hover:border-[#A054A0] hover:bg-purple-50 hover:text-[#A054A0] focus:outline-none focus:ring-2 focus:ring-[#A054A0]/30"
+                    >
+                      {micromarket ? `${micromarket} · ${city}` : city}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           <div className="grid grid-cols-2 gap-3 lg:hidden">
             <button
               type="button"
@@ -2294,10 +2364,12 @@ function PropertiesClientContent() {
                     <label className="mb-1.5 block text-xs font-semibold text-slate-700">
                       City
                     </label>
+                    {/* Native arrow hidden so it lines up with the Micromarket arrow. */}
+                    <div className="relative">
                     <select
                       value={resolvedCity}
                       onChange={(e) => handleCityChange(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-800 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/15"
+                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-xs font-medium text-slate-800 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/15"
                     >
                       <option value="">All Cities</option>
                       {cities.map((cityOption) => (
@@ -2306,6 +2378,8 @@ function PropertiesClientContent() {
                         </option>
                       ))}
                     </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-800" />
+                    </div>
 
 
 
@@ -2405,10 +2479,11 @@ function PropertiesClientContent() {
                     <label className="mb-1.5 block text-xs font-semibold text-slate-700">
                       Office Type
                     </label>
+                    <div className="relative">
                     <select
                       value={filters.type === "ai" ? "" : filters.type}
                       onChange={(e) => updateFilter("type", e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-800 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/15"
+                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-xs font-medium text-slate-800 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/15"
                     >
                       <option value="">All Types</option>
                       {OFFICE_TYPES.map((type) => (
@@ -2417,6 +2492,8 @@ function PropertiesClientContent() {
                         </option>
                       ))}
                     </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-800" />
+                    </div>
                   </div>
 
                   {isCoworking ? (
@@ -2528,6 +2605,10 @@ function PropertiesClientContent() {
                   Unable to load properties
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">{error}</p>
+              </div>
+            ) : aiClarification ? (
+              <div className="rounded-xl border border-slate-800/25 bg-white p-6 text-sm text-slate-600 shadow-sm">
+                Choose a micro-market above to see matching properties.
               </div>
             ) : totalProperties === 0 ? (
               <div className="space-y-8">
@@ -2737,110 +2818,6 @@ function PropertiesClientContent() {
           </p>
         )}
       </main>
-
-      {aiClarification && (
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ai-city-clarification-title"
-        >
-          <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-800/25 bg-white shadow-2xl">
-            <div className="border-b border-slate-100 bg-purple-50/60 p-5">
-              <div className="flex items-start gap-3">
-                <Sparkles className="mt-1 h-5 w-5 shrink-0 text-[#A054A0]" />
-
-                <div className="min-w-0 flex-1">
-                  <h2
-                    id="ai-city-clarification-title"
-                    className="text-lg font-bold text-slate-900"
-                  >
-                    {aiClarification.title ||
-                      "Which city do you want to search in?"}
-                  </h2>
-
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    {aiClarification.message ||
-                      "Choose a city to refine your property search."}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setAiClarification(null)}
-                  aria-label="Close city selection"
-                  className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-700"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-4 p-5">
-              {aiClarification.originalQuery && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Your original search
-                  </p>
-                  <p className="mt-1 text-sm text-slate-700">
-                    {aiClarification.originalQuery}
-                  </p>
-                </div>
-              )}
-
-              <p className="text-xs font-semibold text-slate-500">
-                Select a city to continue
-              </p>
-
-              <div className="max-h-[45vh] space-y-2 overflow-y-auto">
-                {(aiClarification.options || []).map((option) => {
-                  const city =
-                    typeof option === "string"
-                      ? option
-                      : String(option?.city || "").trim();
-
-                  if (!city) return null;
-
-                  const markets = Array.isArray(option?.micromarkets)
-                    ? option.micromarkets.filter(Boolean)
-                    : [];
-
-                  return (
-                    <button
-                      key={city}
-                      type="button"
-                      onClick={() => handleConfirmAiCity(city)}
-                      className="group flex w-full items-center justify-between gap-3 rounded-xl border border-slate-800/25 p-4 text-left transition hover:border-[#A054A0]/50 hover:bg-purple-50/60 focus:outline-none focus:ring-2 focus:ring-[#A054A0]/30"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-slate-900">
-                          {city}
-                        </span>
-
-                        {markets.length > 0 && (
-                          <span className="mt-1 block text-xs leading-5 text-slate-500">
-                            Matching micromarkets: {markets.join(", ")}
-                          </span>
-                        )}
-                      </span>
-
-                      <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-[#A054A0]" />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setAiClarification(null)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showSelectionBar && (
         <div className="fixed bottom-3 left-1/2 z-[90] w-[calc(100%-1.5rem)] max-w-5xl -translate-x-1/2 rounded-xl border border-slate-400/80 bg-white/95 p-3 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:w-[calc(100%-2.5rem)] sm:p-5">
