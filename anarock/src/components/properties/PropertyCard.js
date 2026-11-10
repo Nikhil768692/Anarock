@@ -169,8 +169,8 @@ function PropertyCard({
 
   return (
     <article className="group relative z-0 flex flex-col overflow-hidden rounded-2xl border border-[#E8E3DC] transition-all duration-500 ease-out hover:z-20 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(39,29,23,0.10)]">
-      <div className="relative overflow-hidden p-2.5 sm:p-3">
-        <div className="relative aspect-[3/2] w-full overflow-hidden rounded-xl">
+      <div className="relative overflow-hidden p-2.5">
+        <div className="relative aspect-[3/2] w-full overflow-hidden rounded-xl sm:aspect-[16/10]">
           <Link
             href={propertyUrl}
             aria-label={`View details of ${propertyName}`}
@@ -273,7 +273,7 @@ function PropertyCard({
       <Link
         href={propertyUrl}
         aria-label={`View details of ${propertyName}`}
-        className="flex flex-col px-4 pb-3 pt-2 sm:px-5 sm:pb-5"
+        className="flex flex-col px-4 pb-3 pt-2 sm:pb-4"
       >
         <div className="mb-2.5 flex items-center justify-between gap-[1.2rem]">
           <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#A054A0]">
@@ -284,7 +284,7 @@ function PropertyCard({
         </div>
 
         <h3
-          className="line-clamp-2 min-h-[42px] text-[15px] flex items-center font-semibold leading-5 tracking-[0.025em] text-black transition-colors duration-300 group-hover:text-[#A054A0] sm:text-[18px]"
+          className="line-clamp-2 min-h-[42px] text-[15px] flex items-center font-semibold leading-5 tracking-[0.025em] text-black transition-colors duration-300 group-hover:text-[#A054A0] sm:text-[16px]"
           title={propertyName}
         >
           {propertyName}
@@ -295,7 +295,7 @@ function PropertyCard({
             className="h-3 w-3 shrink-0 text-[#]"
             strokeWidth={1.7}
           />
-          <p className="line-clamp-2 min-w-0 text-[8px] leading-[1.6] text-black sm:text-sm">
+          <p className="line-clamp-2 min-w-0 text-[8px] leading-[1.6] text-black sm:text-[13px]">
             {location || "Location unavailable"}
           </p>
         </div>
