@@ -60,8 +60,8 @@ function LegalHero({ title }) {
         className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/20 to-transparent"
       />
 
-      <div className="relative mx-auto flex h-[220px] w-full max-w-[1376px] items-end px-4 pb-[28px] sm:h-[240px] sm:px-6 sm:pb-[36px] md:h-[260px] lg:h-[290px] lg:pb-[48px]">
-        <h1 className="text-[34px] font-medium leading-none tracking-tight text-[#A054A0] sm:text-[42px] lg:text-[50px]">
+      <div className="relative mx-auto flex h-[220px] w-full max-w-[1376px] items-end px-4 pb-[28px] sm:h-[240px] sm:px-6 sm:pb-[36px] md:h-[260px] lg:h-[14.5rem] lg:pb-[2.4rem]">
+        <h1 className="text-[34px] font-medium leading-none tracking-tight text-[#A054A0] sm:text-[42px] lg:text-[2.5rem]">
           {title}
         </h1>
       </div>
@@ -102,7 +102,7 @@ export default function ReraPage() {
       <LegalHero title="RERA" />
 
       <main className="w-full bg-white">
-        <div className="mx-auto w-full max-w-[1376px] px-4 pb-[56px] pt-[36px] sm:px-6 sm:pb-[64px] sm:pt-[44px] lg:pb-[80px] lg:pt-[52px]">
+        <div className="mx-auto w-full max-w-[1376px] px-4 pb-[56px] pt-[36px] sm:px-6 sm:pb-[64px] sm:pt-[44px] lg:pb-[4rem] lg:pt-[2.6rem]">
           {/* Tablet and desktop: table */}
           <div className="hidden overflow-hidden border border-black/10 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] md:block">
             <table className="w-full table-fixed border-collapse text-left">
@@ -120,7 +120,7 @@ export default function ReraPage() {
                     <th
                       key={heading}
                       scope="col"
-                      className="px-5 py-4 text-[13px] font-semibold uppercase tracking-[0.08em] lg:px-7 lg:py-[18px] lg:text-[15px]"
+                      className="px-5 py-4 text-[13px] font-semibold uppercase tracking-[0.08em] lg:px-7 lg:py-[0.9rem] lg:text-[length:max(13px,0.75rem)]"
                     >
                       {heading}
                     </th>
@@ -133,13 +133,13 @@ export default function ReraPage() {
                     key={`${row.state}-${row.location}`}
                     className={`border-b border-black/10 last:border-b-0 ${index % 2 === 1 ? "bg-[#fafafa]" : "bg-white"}`}
                   >
-                    <td className="px-5 py-4 text-[15px] text-black lg:px-7 lg:py-[18px] lg:text-[17px]">
+                    <td className="px-5 py-4 text-[15px] text-black lg:px-7 lg:py-[0.9rem] lg:text-[length:max(15px,0.85rem)]">
                       {row.state}
                     </td>
-                    <td className="px-5 py-4 text-[15px] text-black lg:px-7 lg:py-[18px] lg:text-[17px]">
+                    <td className="px-5 py-4 text-[15px] text-black lg:px-7 lg:py-[0.9rem] lg:text-[length:max(15px,0.85rem)]">
                       {row.location}
                     </td>
-                    <td className="break-words px-5 py-4 text-[15px] font-semibold text-[#111111] lg:px-7 lg:py-[18px] lg:text-[17px]">
+                    <td className="break-words px-5 py-4 text-[15px] font-semibold text-[#111111] lg:px-7 lg:py-[0.9rem] lg:text-[length:max(15px,0.85rem)]">
                       {row.number}
                     </td>
                   </tr>

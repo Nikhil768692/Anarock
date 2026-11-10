@@ -62,8 +62,8 @@ function LegalHero({ title }) {
         className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/20 to-transparent"
       />
 
-      <div className="relative mx-auto flex h-[220px] w-full max-w-[1376px] items-end px-4 pb-[28px] sm:h-[240px] sm:px-6 sm:pb-[36px] md:h-[260px] lg:h-[290px] lg:pb-[48px]">
-        <h1 className="text-[34px] font-medium leading-none tracking-tight text-[#A054A0] sm:text-[42px] lg:text-[50px]">
+      <div className="relative mx-auto flex h-[220px] w-full max-w-[1376px] items-end px-4 pb-[28px] sm:h-[240px] sm:px-6 sm:pb-[36px] md:h-[260px] lg:h-[14.5rem] lg:pb-[2.4rem]">
+        <h1 className="text-[34px] font-medium leading-none tracking-tight text-[#A054A0] sm:text-[42px] lg:text-[2.5rem]">
           {title}
         </h1>
       </div>
@@ -76,11 +76,11 @@ function LegalHero({ title }) {
 /* ------------------------------------------------------------------ */
 
 const BODY_TEXT =
-  "text-[15px] leading-[1.55] text-black sm:text-[16px] lg:text-[17px]";
+  "text-[15px] leading-[1.55] text-black sm:text-[16px] lg:text-[length:max(15px,0.85rem)]";
 
 function SectionHeading({ children }) {
   return (
-    <h2 className="text-[21px] font-semibold leading-[1.25] text-[#8B3D92] sm:text-[22px] lg:text-[24px]">
+    <h2 className="text-[21px] font-semibold leading-[1.25] text-[#8B3D92] sm:text-[22px] lg:text-[length:max(22px,1.2rem)]">
       {children}
     </h2>
   );
@@ -349,8 +349,8 @@ export default function PrivacyPolicyPage() {
       <LegalHero title="Privacy Policy" />
 
       <main className="w-full bg-white">
-        <div className="mx-auto w-full max-w-[1376px] px-4 pb-[56px] pt-[36px] sm:px-6 sm:pb-[64px] sm:pt-[44px] lg:pb-[80px] lg:pt-[52px]">
-          <div className="space-y-[28px] sm:space-y-[32px] lg:space-y-[36px]">
+        <div className="mx-auto w-full max-w-[1376px] px-4 pb-[56px] pt-[36px] sm:px-6 sm:pb-[64px] sm:pt-[44px] lg:pb-[4rem] lg:pt-[2.6rem]">
+          <div className="space-y-[28px] sm:space-y-[32px] lg:space-y-[1.8rem]">
             <Section id="introduction" title="Introduction: Who We Are">
               <Paragraph>
                 This Privacy Policy applies to Anarock Property Consultants
