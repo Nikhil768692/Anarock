@@ -1,6 +1,6 @@
-Anarock
+# Anarock
 
-AI-powered commercial real estate search platform for India, built on **Zoho Catalyst**. The project pairs a Next.js storefront with a Catalyst serverless backend, and integrates with **Zoho CRM** (lead capture, city/micromarket lookups) and **Zoho Catalyst Data Store & Stratus** (property listings and images).
+AI-powered commercial real estate search platform for India, built on **Zoho Catalyst**. The project is a Next.js storefront deployed as a Catalyst Slate app. It reads property listings and page content from the **Catalyst Data Store**, images from **Catalyst Stratus**, and sends leads to **Zoho CRM**.
 
 > Marketing copy from the app: _"Anarock — Premium Commercial Real Estate in India"_, _"India's leading commercial real estate advisory."_
 
@@ -8,71 +8,84 @@ AI-powered commercial real estate search platform for India, built on **Zoho Cat
 
 ```
 .
-├── anarock/                 # Next.js 14 frontend (deployed as a Catalyst Slate app)
-│   ├── src/app/              # App Router pages + API routes
-│   ├── src/components/       # UI components (shadcn/ui-based design system + feature components)
-│   ├── src/lib/               # Catalyst SDK wiring, formatting, wishlist & preferences helpers
-│   └── src/pages/HomePage.js  # Main landing page composition
-├── reports/                 # Dated FusionHawk assessment PDFs (security, code review, test scenarios)
-├── Anarock-Cla-Online-Listing-Platform Scope (1).docx   # Statement of work / scope document
-├── catalyst.json             # Catalyst project manifest (registers the Slate app)
+├── anarock/                   # Next.js 14 frontend (deployed as a Catalyst Slate app)
+│   ├── src/app/               # App Router pages + API routes
+│   ├── src/components/        # Feature components (layout, home, properties, common)
+│   ├── src/lib/               # Catalyst/Zoho wiring, caching, formatting, preferences, request guards
+│   ├── src/pages/HomePage.js  # Main landing page composition
+│   └── .env.example           # List of required environment variables (names only)
+├── catalyst.json              # Catalyst project manifest (registers the Slate app)
 ├── .catalystrc                # Local Catalyst CLI project/environment configuration
 └── package.json               # Root-level package manifest
 ```
 
 ## Tech Stack
 
-- **Frontend:** Next.js 14 (App Router), React 18, Tailwind CSS, Framer Motion, shadcn/ui-style components (Radix primitives), `lucide-react` icons
-- **Backend / Hosting:** [Zoho Catalyst](https://catalyst.zoho.com/) — Slate (frontend hosting), Advanced I/O Functions, Data Store, Stratus (object storage)
+- **Frontend:** Next.js 14.2.35 (App Router), React 18, Tailwind CSS, Framer Motion, `lucide-react` icons
+- **Backend / Hosting:** [Zoho Catalyst](https://catalyst.zoho.com/): Slate (hosting), Data Store, Stratus (object storage)
 - **Integrations:**
-  - Zoho CRM v8 REST API — Leads, City, and micromarket data
-  - Frankfurter API — live currency exchange rates (INR, AED, USD, EUR, SGD)
-  - OpenStreetMap Nominatim — reverse geocoding for location detection
+  - Zoho CRM v8 REST API: Leads, City and Micromarket modules
+  - Google Gemini: understands AI search queries
+  - Frankfurter API: currency exchange rates (INR, AED, USD, EUR, SGD), fetched once a day
+  - OpenStreetMap Nominatim: reverse geocoding for location detection
 - **SDK:** `zcatalyst-sdk-node`
 
 ## Key Features
 
-- **Property search & listings** — browse, filter (city / type / micromarket), and view individual commercial property details, backed by a Catalyst Data Store table and paginated fetches
-- **Property comparison** — compare shortlisted properties (client-side, `localStorage`-backed)
-- **Wishlist** — save properties per session
-- **Lead capture** — submits inquiries directly into Zoho CRM's Leads module
-- **City & micromarket data** — sourced from Zoho CRM
-- **Location detection** — reverse geocoding via OpenStreetMap
-- **Live currency conversion** — INR/AED/USD/EUR/SGD exchange rates
-- **Market stats widget** — aggregate stock/vacancy/transaction figures on the homepage
-- **KYC page** — city-specific compliance/info page (e.g. Delhi)
+- **Property search & listings:** filter by city, micro-market, office type, rent and area; sort; paginate. Listings come from the Catalyst Data Store and are cached for 10 minutes.
+- **AI search:** describe a requirement in plain words (for example "office in Bengaluru under 80 per sq ft"). The page shows the understood filters as chips. If a micro-market name has listings in more than one city and no city was named, the page asks which one is meant, below the search bar.
+- **Property detail page:** gallery, specifications, rent and seat price in the selected currency and area unit.
+- **Compare:** up to 3 properties side by side (stored in the browser).
+- **Shortlist:** saved properties and one enquiry for all of them (stored in the browser).
+- **City pages (`/kyc/city/<city>`):** advisor card, market stats, "Did you know?" insight, micro-market cards with rent bands, 8 properties and a requirement form. Content comes from Catalyst tables (see below).
+- **Home page FAQs:** loaded from the Catalyst `FAQ` table.
+- **Lead capture:** callback, post-a-requirement and shortlist enquiry forms create leads in Zoho CRM.
+- **Currency and unit switching:** INR / AED / USD / EUR / SGD and sq ft / sq m, applied to prices, rents and areas on every page.
+- **Legal pages:** Privacy Policy, Terms of Use and RERA.
+- **Location detection, cookie consent, dynamic sitemap and robots.txt.**
+
+## Catalyst Data Store Tables
+
+| Table              | Used for                                                                                     |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| `Properties`       | All property listings                                                                        |
+| `FAQ`              | Home page FAQs (`Question`, `Answer`)                                                        |
+| `CityAdvisors`     | City page advisor card (`CityName`, `AdvisorName`, `Designation`, `ExperienceYears`, `PhotoUrl`) |
+| `CityMarketStats`  | City page market stats and "Did you know?" card                                             |
+| `CityMicromarkets` | City page micro-market names and rent bands (`CityName`, `MicromarketName`, `RentMin`, `RentMax`, `SortOrder`, `PropertyMicromarket`) |
+
+The site reads the **Production** environment. Create tables in Development, deploy them to Production, and add rows in Production. Changes show on the site within the cache time (5 to 10 minutes).
+
+Property images are stored in the Stratus bucket `property-images`, in a folder named by the property's `ImageFolderPath` (for example `Project_Picture_1.jpg`, `Floor_Plan_1.jpg`, `Property_Photo_1.jpg` to `Property_Photo_5.jpg`).
 
 ## Prerequisites
 
-- Node.js (Catalyst function runtime targets **Node.js 24**; the Next.js app requires Node 18+)
+- Node.js 18 or later
 - A [Zoho Catalyst](https://catalyst.zoho.com/) account and project
 - [Catalyst CLI](https://catalyst.zoho.com/help/cli.html) (`npm install -g zcatalyst-cli`)
-- Zoho CRM API credentials (OAuth client for the self-client / server-based application used to push leads)
+- Zoho CRM OAuth credentials (self-client or server-based application)
+- A Google Gemini API key for AI search
 
 ## Environment Variables
 
-Create `anarock/.env.local` with the credentials the app needs at runtime:
+Copy `anarock/.env.example` to `anarock/.env.local` and fill in the values. The example file lists every variable the code reads, grouped by purpose, with defaults for the optional ones. Never commit `.env.local`.
 
-| Variable                                                                                            | Used for                                                                        |
-| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `CATALYST_CLIENT_ID` / `CATALYST_CLIENT_SECRET` / `CATALYST_REFRESH_TOKEN`                          | Catalyst SDK auth (Data Store + Stratus access)                                 |
-| `CATALYST_PROJECT_ID` / `CATALYST_PROJECT_KEY` / `CATALYST_PROJECT_DOMAIN` / `CATALYST_ENVIRONMENT` | Catalyst project identifiers (fall back to `.catalystrc` if omitted)            |
-| `CATALYST_PROPERTIES_TABLE_ID`                                                                      | Data Store table ID for property listings (defaults to a hard-coded ID)         |
-| `CATALYST_ACCOUNTS_URL`                                                                             | Zoho accounts domain for token refresh (defaults to `https://accounts.zoho.in`) |
-| `ZOHO_CLIENT_ID` / `ZOHO_CLIENT_SECRET` / `ZOHO_REFRESH_TOKEN`                                      | Zoho CRM OAuth credentials (Leads, City, micromarket APIs)                      |
-|                                                                                                     |
+Main groups:
 
-> No `.env.example` ships in the repo — populate the variables above based on your own Catalyst project and Zoho CRM OAuth client.
+| Variables                                                                                 | Used for                                         |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `PROJECT_ID`, `PROJECT_KEY`, `CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`                | Catalyst Data Store access (`src/lib/catalyst.js`) |
+| `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`                              | Zoho CRM leads, cities and micro-markets         |
+| `ZOHO_CRM_CLIENT_ID`, `ZOHO_CRM_CLIENT_SECRET`, `ZOHO_CRM_REFRESH_TOKEN` (or `ZOHO_CRM_ACCESS_TOKEN`) | "List your Property" city/micro-market lookups |
+| `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_SEARCH_DAILY_LIMIT`                                 | AI search                                        |
+| `NEXT_PUBLIC_BASE_URL`                                                                    | Sitemap, robots.txt and canonical links          |
+| `TRUSTED_PROXY_COUNT`                                                                     | Finding the real visitor IP for rate limits      |
 
 ## Getting Started
 
 ### 1. Install dependencies
 
 ```bash
-# Root (shared/serverless-function dependencies)
-npm install
-
-# Frontend
 cd anarock
 npm install
 ```
@@ -81,7 +94,7 @@ npm install
 
 ```bash
 catalyst login
-catalyst init      # or catalyst config, if the project is already registered — see .catalystrc
+catalyst init      # or catalyst config, if the project is already registered (see .catalystrc)
 ```
 
 ### 3. Run the frontend locally
@@ -89,8 +102,6 @@ catalyst init      # or catalyst config, if the project is already registered �
 ```bash
 cd anarock
 npm run dev            # http://localhost:3000
-# or, matching the Catalyst Slate dev command:
-npm run dev -- --port 3001
 ```
 
 ### 4. Deploy
@@ -99,7 +110,7 @@ npm run dev -- --port 3001
 catalyst deploy
 ```
 
-This deploys the `anarock` Slate (Next.js) app declared in `catalyst.json`. Note: `catalyst.json` currently points at a Windows source path (`D:\\Catalyst\\anarock`); adjust it to `anarock` for other machines.
+This deploys the `anarock` Slate (Next.js) app declared in `catalyst.json`. Note: `catalyst.json` points at a Windows source path (`D:\\Catalyst\\anarock`); adjust it for other machines.
 
 ## Scripts (`anarock/`)
 
@@ -110,52 +121,27 @@ This deploys the `anarock` Slate (Next.js) app declared in `catalyst.json`. Note
 | `npm run start` | Start the production server  |
 | `npm run lint`  | Run ESLint                   |
 
-## Notes
-
-- The `functions/anarock_function` Advanced I/O function mentioned in earlier versions is **not present in the repository**; backend logic currently lives in the Next.js API routes under `anarock/src/app/api/`.
-- Property images are stored in a Catalyst Stratus bucket named `property-images`.
-- The wishlist API endpoint currently returns an empty item set as a stub.
-
 ## API Routes (`anarock/src/app/api/`)
 
-| Route                                                     | Purpose                                                                                                        |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `properties`, `properties/[id]`, `properties/suggestions` | Listing search/filter/sort, property detail, search suggestions (Catalyst Data Store, cached)                  |
-| `leads`                                                   | Navbar "request a callback" lead into Zoho CRM (validation, honeypot, in-memory rate limit)                    |
-| `lead2`                                                   | Home page "post a requirement" lead into Zoho CRM (**no rate limit or input validation**; see security report) |
-| `lead3`                                                   | Shortlist enquiry: lead plus `Interested_Properties` subform rows in Zoho CRM                                  |
-| `cities`, `micromarkets`                                  | City and micromarket lookups from Zoho CRM (cached)                                                            |
-| `market-stats`, `kyc`                                     | Market statistics and city KYC data                                                                            |
-| `location`                                                | Reverse geocoding (OpenStreetMap Nominatim)                                                                    |
-| `exchange-rates`                                          | Currency rates (Frankfurter)                                                                                   |
-| `wishlist`                                                | Stub (returns empty set)                                                                                       |
+| Route                                                     | Purpose                                                                                       |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `properties`, `properties/[id]`, `properties/suggestions` | Listing search/filter/sort, property detail, suggested properties (Data Store, cached)        |
+| `ai-search`                                               | AI search: Gemini reads the query, the server filters listings (rate limited, daily Gemini cap) |
+| `leads`                                                   | "Request a callback" lead into Zoho CRM (validation, rate limit)                              |
+| `lead2`                                                   | "Post a requirement" lead from the home and city pages (validation, rate limit, fixed lead source) |
+| `lead3`                                                   | Shortlist enquiry: lead plus `Interested_Properties` subform rows                             |
+| `cities`, `micromarkets`                                  | City and micro-market lookups from Zoho CRM (cached)                                          |
+| `city-page`                                               | City page advisor, market stats and micro-market rent bands (Data Store, cached 5 minutes)   |
+| `faqs`                                                    | Home page FAQs (Data Store, cached 5 minutes)                                                 |
+| `market-stats`                                            | Home page market statistics                                                                   |
+| `list-your-property`                                      | City/micro-market options for the owner form (cached 30 minutes)                              |
+| `location`                                                | Reverse geocoding (OpenStreetMap Nominatim)                                                   |
+| `exchange-rates`                                          | Currency rates (Frankfurter), cached for 24 hours                                             |
+| `wishlist`                                                | Stub (returns an empty set)                                                                   |
 
-## Scope Status (vs. _Anarock CLA Online Listing Platform Scope_)
+## Security
 
-- **Implemented:** listing and detail pages (client-rendered; server-side rendering for SEO is still pending), static sitemap/robots (need fixes), currency switching (INR, AED, USD, EUR, SGD), area-unit switching (sq ft / sq m), CRM lead capture, city/micromarket data, KYC city pages, compare, client-side wishlist, list-your-property page, cookie consent.
-- **Not yet in the repository:** Gemini AI attribute generation, CRM-to-Stratus image sync, Catalyst Search / AI semantic search, Zoho SalesIQ chatbot, Zoho PageSense, GA4, property view-count scoring to CRM, linear unit switching (feet/metre; area units are done), on-demand revalidation, listing JSON-LD.
-
-## Catalyst Environment (read-only inspection, 2026-10-16)
-
-| Item                    | State                                                                                                    |
-| ----------------------- | -------------------------------------------------------------------------------------------------------- |
-| Project                 | `Anarock` (Development + Production environments, `.in` data centre)                                     |
-| Slate, Production       | app `anarock` (upload type): deployment **failed** (build failed on 2026-10-14); no live Production site |
-| Slate, Development      | apps `Anarock` and `nextjs`: both deployed and enabled (2026-10-14)                                      |
-| Data Store              | tables `Properties` (395 rows), `KYC` (9), `Stats` (1)                                                   |
-| Stratus                 | bucket `property-images` (Production and Development)                                                    |
-| Functions               | `stratus_upload` only; not deployed and its source is not in this repository                             |
-| API Gateway             | one rule (`stratus_upload`); nothing in front of the Next.js API routes                                  |
-| AppSail / Cron / Search | none configured                                                                                          |
-
-## Assessment Reports
-
-Dated PDF reports (Security, Code Review, Test Scenarios, Scope Completeness) are stored in [`reports/`](reports/), suffixed with the run date (latest: 2026-10-16). Raw logs and the repeatable test scripts (`run_api_tests.sh`, `run_browser_tests.js`) are in [`reports/evidence/`](reports/evidence/). Findings were verified by running the code and by read-only queries of Zoho CRM and Catalyst, not only by reading it.
-
-Current state (2026-10-16, run 4):
-
-- `npm run build` **fails** on an ESLint error (`react/no-unescaped-entities` in `src/app/list-your-property/page.js:993`), and `npm ci` fails because `package-lock.json` is out of sync; use `npm install` until the lockfile is regenerated. The Production Slate deployment also failed (cause not retrievable via the connector).
-- `npm audit`: 13 advisories (1 critical, 10 high, 2 moderate), mainly Next.js 14.2.35.
-- Listing pages are client-rendered; the sitemap is static (4 URLs, two return 404, one is invalid XML because of an unescaped `&`); footer links `/aboutus`, `/privacy-policy`, `/rera`, `/terms-of-use` return 404.
-- Open security items: unprotected `/api/lead2`, bypassable rate limiting (client-supplied `X-Forwarded-For`), no security headers, internal error text returned by APIs, and the public property API returns every Data Store column (including `SPOCName`, `SPOCNumber`, `AchievableRent`).
-- No tests, CI, `.env.example` or monitoring exist in the repository.
+- Lead and AI search routes are rate limited per visitor IP. The IP is read from the end of `X-Forwarded-For` (see `TRUSTED_PROXY_COUNT`), so a value sent by the visitor is ignored. Limits are kept in server memory; the API Gateway throttle remains the main protection when several instances run.
+- Request bodies are size-limited, invalid JSON returns 400, and visitors see fixed error messages instead of internal or Zoho error details.
+- Personal data (names, phone numbers, emails, locations) is not written to server logs.
+- Security headers and a Content Security Policy are set in `next.config.mjs`. Scripts are allowed only from the site and the Zoho CDN. HSTS and X-Frame-Options are added by Catalyst Slate.
