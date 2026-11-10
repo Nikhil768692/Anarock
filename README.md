@@ -37,7 +37,7 @@ AI-powered commercial real estate search platform for India, built on **Zoho Cat
 - **Property detail page:** gallery, specifications, rent and seat price in the selected currency and area unit.
 - **Compare:** up to 3 properties side by side (stored in the browser).
 - **Shortlist:** saved properties and one enquiry for all of them (stored in the browser).
-- **City pages (`/kyc/city/<city>`):** advisor card, market stats, "Did you know?" insight, micro-market cards with rent bands, 8 properties and a requirement form. Content comes from Catalyst tables (see below).
+- **City pages (`/kyc/city/<city>`):** advisor card, market stats, micro-market cards with rent bands, 9 properties and a requirement form. Content comes from Catalyst tables (see below).
 - **Home page FAQs:** loaded from the Catalyst `FAQ` table.
 - **Lead capture:** callback, post-a-requirement and shortlist enquiry forms create leads in Zoho CRM.
 - **Currency and unit switching:** INR / AED / USD / EUR / SGD and sq ft / sq m, applied to prices, rents and areas on every page.
@@ -51,7 +51,7 @@ AI-powered commercial real estate search platform for India, built on **Zoho Cat
 | `Properties`       | All property listings                                                                        |
 | `FAQ`              | Home page FAQs (`Question`, `Answer`)                                                        |
 | `CityAdvisors`     | City page advisor card (`CityName`, `AdvisorName`, `Designation`, `ExperienceYears`, `PhotoUrl`) |
-| `CityMarketStats`  | City page market stats and "Did you know?" card                                             |
+| `CityMarketStats`  | City page market stats                                                                       |
 | `CityMicromarkets` | City page micro-market names and rent bands (`CityName`, `MicromarketName`, `RentMin`, `RentMax`, `SortOrder`, `PropertyMicromarket`) |
 
 The site reads the **Production** environment. Create tables in Development, deploy them to Production, and add rows in Production. Changes show on the site within the cache time (5 to 10 minutes).

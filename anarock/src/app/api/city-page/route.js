@@ -150,10 +150,6 @@ function mapMarketStats(row) {
     absorptionMnSqft: toNumber(getField(row, "AbsorptionMnSqft")),
     newSupplyMnSqft: toNumber(getField(row, "NewSupplyMnSqft")),
     mostActiveMicromarket: toText(getField(row, "MostActiveMicromarket")),
-    preCommittedPercent: toNumber(getField(row, "PreCommittedPercent")),
-    trackingMonths: toNumber(getField(row, "TrackingMonths")),
-    insightMicromarket: toText(getField(row, "InsightMicromarket")),
-    insightYear: toNumber(getField(row, "InsightYear")),
   };
 }
 

@@ -11,7 +11,6 @@ import {
   Building2,
   Check,
   GitCompare,
-  Lightbulb,
   Loader2,
   X,
 } from "lucide-react";
@@ -19,7 +18,7 @@ import {
 const COMPARE_STORAGE_KEY = "anarock_compare_properties";
 const MAX_COMPARE_PROPERTIES = 3;
 const MIN_COMPARE_PROPERTIES = 2;
-const PROPERTIES_TO_SHOW = 8;
+const PROPERTIES_TO_SHOW = 9;
 const MICROMARKETS_TO_SHOW = 6;
 
 const DARK = "#0A0A0A";
@@ -33,36 +32,6 @@ const HERO_TITLE = "Find your next office in India’s office capital";
 
 const ADVISOR_BLURB =
   "Get an off-market shortlist and rental benchmarks for your requirement, at no cost to occupiers.";
-
-// Everything in this card comes from the CityMarketStats table:
-// PreCommittedPercent, TrackingMonths, InsightMicromarket and InsightYear.
-// If InsightMicromarket is empty, MostActiveMicromarket is used, and if that
-// is empty too the sentence uses the city name. If InsightYear is empty, the
-// year from QuarterLabel is used. The card stays hidden until both numbers exist.
-function getInsight(market, city) {
-  const percent = market?.preCommittedPercent;
-  const months = market?.trackingMonths;
-
-  if (!Number.isFinite(percent) || !Number.isFinite(months)) return null;
-
-  const micromarket =
-    market?.insightMicromarket || market?.mostActiveMicromarket || "";
-  const place = micromarket ? `on ${micromarket}` : `in ${city}`;
-
-  const quarterYear = String(market?.quarterLabel || "").match(/\b(19|20)\d{2}\b/);
-  const year = Number.isFinite(market?.insightYear)
-    ? String(market.insightYear)
-    : quarterYear
-      ? quarterYear[0]
-      : "";
-  const completion = year ? `before completion in ${year}` : "before completion";
-
-  return {
-    title: `${formatNumber(percent)}% of new Grade A space ${place} was pre-committed ${completion}.`,
-    body: `The best floors often never reach a listing. Our advisors track buildings ${formatNumber(months, 0)} months before they open.`,
-    cta: "Ask what’s coming up",
-  };
-}
 
 const ADVISOR_CALLBACK_HOURS = 24;
 
@@ -434,13 +403,6 @@ export default function CityPageClient({ city }) {
     router.push("/compare");
   };
 
-  const scrollToRequirementForm = () => {
-    document
-      .getElementById("city-requirement")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const insight = getInsight(cityData.market, city);
   const totalProperties = allProperties.length;
   const countLabel = loadingProperties
     ? "…"
@@ -598,12 +560,6 @@ export default function CityPageClient({ city }) {
                     onCompareToggle={() => handleCompareToggle(property)}
                   />
                 ))}
-                {insight && (
-                  <InsightCard
-                    insight={insight}
-                    onClick={scrollToRequirementForm}
-                  />
-                )}
               </div>
 
               {totalProperties > visibleProperties.length && (
@@ -838,31 +794,6 @@ function PropertyGridItem({ property, isCompared, onCompareToggle }) {
         isCompared={isCompared}
         onCompareToggle={onCompareToggle}
       />
-    </div>
-  );
-}
-
-function InsightCard({ insight, onClick }) {
-  return (
-    <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-[#E8D9E6] bg-[#F4EAF2] p-6 sm:p-7">
-      <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B2F77]">
-        <Lightbulb className="h-4 w-4" strokeWidth={1.8} />
-        Did you know?
-      </p>
-      <p className="mt-3 text-[20px] font-bold leading-snug text-black sm:text-[22px]">
-        {insight.title}
-      </p>
-      <p className="mt-3 text-sm leading-6 text-black/75">{insight.body}</p>
-      <div>
-        <button
-          type="button"
-          onClick={onClick}
-          style={{ backgroundColor: DARK }}
-          className="mt-5 inline-flex min-h-10 items-center rounded-md px-4 text-sm font-semibold text-white transition hover:opacity-90"
-        >
-          {insight.cta}
-        </button>
-      </div>
     </div>
   );
 }
