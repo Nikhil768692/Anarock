@@ -47,6 +47,50 @@ import {
 
 } from "lucide-react";
 
+// Same country list as the home page requirement form.
+const EXCLUSIVE_PHONE_COUNTRIES = [
+  { name: "India", code: "IN", dial: "+91", flag: "🇮🇳", min: 10, max: 10 },
+  { name: "United States", code: "US", dial: "+1", flag: "🇺🇸", min: 10, max: 10 },
+  { name: "Canada", code: "CA", dial: "+1", flag: "🇨🇦", min: 10, max: 10 },
+  { name: "United Kingdom", code: "GB", dial: "+44", flag: "🇬🇧", min: 10, max: 10 },
+  { name: "United Arab Emirates", code: "AE", dial: "+971", flag: "🇦🇪", min: 9, max: 9 },
+  { name: "Australia", code: "AU", dial: "+61", flag: "🇦🇺", min: 9, max: 9 },
+  { name: "Singapore", code: "SG", dial: "+65", flag: "🇸🇬", min: 8, max: 8 },
+  { name: "Germany", code: "DE", dial: "+49", flag: "🇩🇪", min: 10, max: 11 },
+  { name: "France", code: "FR", dial: "+33", flag: "🇫🇷", min: 9, max: 9 },
+  { name: "Italy", code: "IT", dial: "+39", flag: "🇮🇹", min: 9, max: 10 },
+  { name: "Spain", code: "ES", dial: "+34", flag: "🇪🇸", min: 9, max: 9 },
+  { name: "Netherlands", code: "NL", dial: "+31", flag: "🇳🇱", min: 9, max: 9 },
+  { name: "Switzerland", code: "CH", dial: "+41", flag: "🇨🇭", min: 9, max: 9 },
+  { name: "Ireland", code: "IE", dial: "+353", flag: "🇮🇪", min: 9, max: 9 },
+  { name: "New Zealand", code: "NZ", dial: "+64", flag: "🇳🇿", min: 8, max: 10 },
+  { name: "Japan", code: "JP", dial: "+81", flag: "🇯🇵", min: 10, max: 10 },
+  { name: "South Korea", code: "KR", dial: "+82", flag: "🇰🇷", min: 9, max: 10 },
+  { name: "China", code: "CN", dial: "+86", flag: "🇨🇳", min: 11, max: 11 },
+  { name: "Hong Kong", code: "HK", dial: "+852", flag: "🇭🇰", min: 8, max: 8 },
+  { name: "Malaysia", code: "MY", dial: "+60", flag: "🇲🇾", min: 9, max: 10 },
+  { name: "Thailand", code: "TH", dial: "+66", flag: "🇹🇭", min: 9, max: 9 },
+  { name: "Israel", code: "IL", dial: "+972", flag: "🇮🇱", min: 9, max: 9 },
+  { name: "Indonesia", code: "ID", dial: "+62", flag: "🇮🇩", min: 9, max: 12 },
+  { name: "Philippines", code: "PH", dial: "+63", flag: "🇵🇭", min: 10, max: 10 },
+  { name: "Vietnam", code: "VN", dial: "+84", flag: "🇻🇳", min: 9, max: 10 },
+  { name: "South Africa", code: "ZA", dial: "+27", flag: "🇿🇦", min: 9, max: 9 },
+  { name: "Saudi Arabia", code: "SA", dial: "+966", flag: "🇸🇦", min: 9, max: 9 },
+  { name: "Qatar", code: "QA", dial: "+974", flag: "🇶🇦", min: 8, max: 8 },
+  { name: "Kuwait", code: "KW", dial: "+965", flag: "🇰🇼", min: 8, max: 8 },
+  { name: "Oman", code: "OM", dial: "+968", flag: "🇴🇲", min: 8, max: 8 },
+  { name: "Bahrain", code: "BH", dial: "+973", flag: "🇧🇭", min: 8, max: 8 },
+  { name: "Pakistan", code: "PK", dial: "+92", flag: "🇵🇰", min: 10, max: 10 },
+  { name: "Bangladesh", code: "BD", dial: "+880", flag: "🇧🇩", min: 10, max: 10 },
+  { name: "Nepal", code: "NP", dial: "+977", flag: "🇳🇵", min: 10, max: 10 },
+  { name: "Sri Lanka", code: "LK", dial: "+94", flag: "🇱🇰", min: 9, max: 9 },
+  { name: "Russia", code: "RU", dial: "+7", flag: "🇷🇺", min: 10, max: 10 },
+  { name: "Brazil", code: "BR", dial: "+55", flag: "🇧🇷", min: 10, max: 11 },
+  { name: "Mexico", code: "MX", dial: "+52", flag: "🇲🇽", min: 10, max: 10 },
+  { name: "Argentina", code: "AR", dial: "+54", flag: "🇦🇷", min: 10, max: 11 },
+  { name: "Turkey", code: "TR", dial: "+90", flag: "🇹🇷", min: 10, max: 10 },
+];
+
 const MAX_COMPARE_PROPERTIES = 3;
 const MIN_COMPARE_PROPERTIES = 2;
 const COMPARE_STORAGE_KEY = "anarock_compare_properties";
@@ -317,6 +361,13 @@ function PropertiesClientContent() {
     email: "",
     company: "",
   });
+  const [exclusiveFieldErrors, setExclusiveFieldErrors] = useState({});
+  const [exclusiveCountry, setExclusiveCountry] = useState(
+    EXCLUSIVE_PHONE_COUNTRIES[0],
+  );
+  const [exclusiveCountryOpen, setExclusiveCountryOpen] = useState(false);
+  const [exclusiveCountrySearch, setExclusiveCountrySearch] = useState("");
+  const exclusiveCountryRef = useRef(null);
   const [isEnquiryOpen, setIsEnquiryOpen] = useState(false);
   const [enquirySelection, setEnquirySelection] = useState([]);
   const [compareSelection, setCompareSelection] = useState([]);
@@ -348,6 +399,11 @@ function PropertiesClientContent() {
   const hasShortlistedProperties = wishlistIds.length > 0;
   const hasComparedProperties = compareSelection.length > 0;
   const showSelectionBar = hasShortlistedProperties || hasComparedProperties;
+  // Floating "Looking for something exclusive?" card. Starts open on tablets
+  // and larger screens, and as a small button on phones.
+  const [exclusiveCardOpen, setExclusiveCardOpen] = useState(true);
+  // Cards shown (faded) while the AI search asks which micro-market is meant.
+  const shownPropertiesRef = useRef([]);
   const canCompare = compareSelection.length >= MIN_COMPARE_PROPERTIES &&
     compareSelection.length <= MAX_COMPARE_PROPERTIES;
   const remainingToCompare = Math.max(0, MIN_COMPARE_PROPERTIES - compareSelection.length,);
@@ -646,13 +702,51 @@ function PropertiesClientContent() {
   };
 
   const handleExclusiveLeadChange = (e) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let { value } = e.target;
+
+    if (name === "phone") {
+      value = value.replace(/\D/g, "").slice(0, exclusiveCountry.max);
+    }
 
     setExclusiveLeadForm((prev) => ({
       ...prev,
       [name]: value,
     }));
+    setExclusiveFieldErrors((prev) => ({ ...prev, [name]: "" }));
   };
+
+  const filteredExclusiveCountries = useMemo(() => {
+    const query = exclusiveCountrySearch.trim().toLowerCase();
+    if (!query) return EXCLUSIVE_PHONE_COUNTRIES;
+    return EXCLUSIVE_PHONE_COUNTRIES.filter((country) =>
+      `${country.name} ${country.code} ${country.dial}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [exclusiveCountrySearch]);
+
+  // Close the country list on an outside click or the Escape key.
+  useEffect(() => {
+    if (!exclusiveCountryOpen) return undefined;
+    const handlePointer = (event) => {
+      if (!exclusiveCountryRef.current?.contains(event.target)) {
+        setExclusiveCountryOpen(false);
+      }
+    };
+    const handleKey = (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setExclusiveCountryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("keydown", handleKey, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("keydown", handleKey, true);
+    };
+  }, [exclusiveCountryOpen]);
 
   const closeExclusiveLeadForm = () => {
     if (isSubmittingExclusiveLead) return;
@@ -660,6 +754,8 @@ function PropertiesClientContent() {
     setIsExclusiveLeadOpen(false);
     setExclusiveLeadError("");
     setExclusiveLeadSuccess(false);
+    setExclusiveFieldErrors({});
+    setExclusiveCountryOpen(false);
   };
 
   const handleExclusiveLeadSubmit = async (e) => {
@@ -668,19 +764,37 @@ function PropertiesClientContent() {
     if (isSubmittingExclusiveLead) return;
 
     const name = exclusiveLeadForm.name.trim();
-    const phone = exclusiveLeadForm.phone.trim();
+    const phoneDigits = exclusiveLeadForm.phone.replace(/\D/g, "");
     const email = exclusiveLeadForm.email.trim();
     const company = exclusiveLeadForm.company.trim();
 
+    const fieldErrors = {};
     if (!name) {
-      setExclusiveLeadError("Please enter your name.");
+      fieldErrors.name = "Please enter your name.";
+    }
+    if (!phoneDigits) {
+      fieldErrors.phone = "Please enter your phone number.";
+    } else if (exclusiveCountry.code === "IN") {
+      if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
+        fieldErrors.phone = "Enter a valid 10-digit mobile number.";
+      }
+    } else if (
+      phoneDigits.length < exclusiveCountry.min ||
+      phoneDigits.length > exclusiveCountry.max
+    ) {
+      fieldErrors.phone = `Enter a valid ${exclusiveCountry.name} phone number.`;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      fieldErrors.email = "Enter a valid email address.";
+    }
+
+    setExclusiveFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) {
+      setExclusiveLeadError("");
       return;
     }
 
-    if (!phone) {
-      setExclusiveLeadError("Please enter your phone number.");
-      return;
-    }
+    const phone = `${exclusiveCountry.dial}${phoneDigits}`;
 
     setIsSubmittingExclusiveLead(true);
     setExclusiveLeadError("");
@@ -762,6 +876,12 @@ function PropertiesClientContent() {
   useEffect(() => {
     compareSelectionRef.current = compareSelection;
   }, [compareSelection]);
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 639px)").matches) {
+      setExclusiveCardOpen(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!compareLimitNotice) return undefined;
@@ -1050,11 +1170,33 @@ function PropertiesClientContent() {
 
         if (shouldUseAi && data.needsClarification && data.clarification) {
           setAiClarification(data.clarification);
-          setProperties([]);
           setTotalProperties(0);
           setTotalPagesFromApi(1);
           setSuggestedProperties([]);
           setError("");
+
+          // Keep the cards that were on screen before the search; they are
+          // shown faded under the question. If there were none (the page was
+          // opened straight from an AI search link), load the normal list.
+          if (shownPropertiesRef.current.length > 0) {
+            setProperties(shownPropertiesRef.current);
+          } else {
+            try {
+              const fallbackResponse = await fetch(
+                `/api/properties?page=1&pageSize=${ITEMS_PER_PAGE}`,
+                { signal: controller.signal },
+              );
+              const fallbackData = await fallbackResponse.json().catch(() => ({}));
+              if (controller.signal.aborted) return;
+              setProperties(
+                Array.isArray(fallbackData?.data) ? fallbackData.data : [],
+              );
+            } catch {
+              if (controller.signal.aborted) return;
+              setProperties([]);
+            }
+          }
+
           setLoading(false);
           return;
         }
@@ -1121,7 +1263,11 @@ function PropertiesClientContent() {
 
         setAiClarification(null);
 
-        setProperties(Array.isArray(data.data) ? data.data : []);
+        const nextProperties = Array.isArray(data.data) ? data.data : [];
+        setProperties(nextProperties);
+        if (nextProperties.length > 0) {
+          shownPropertiesRef.current = nextProperties;
+        }
 
         setTotalProperties(Number(data.total || 0));
 
@@ -2074,7 +2220,9 @@ function PropertiesClientContent() {
               <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm">
                 {loading
                   ? "Searching properties..."
-                  : `${totalProperties.toLocaleString("en-IN")} properties found${totalProperties > ITEMS_PER_PAGE
+                  : aiClarification
+                    ? "Choose a micro-market to see matching properties"
+                    : `${totalProperties.toLocaleString("en-IN")} properties found${totalProperties > ITEMS_PER_PAGE
                     ? ` • Page ${safeCurrentPage} of ${totalPages}`
                     : ""
                   }`}
@@ -2607,9 +2755,32 @@ function PropertiesClientContent() {
                 <p className="mt-1 text-xs text-slate-500">{error}</p>
               </div>
             ) : aiClarification ? (
-              <div className="rounded-xl border border-slate-800/25 bg-white p-6 text-sm text-slate-600 shadow-sm">
-                Choose a micro-market above to see matching properties.
-              </div>
+              properties.length > 0 ? (
+                // Earlier cards, faded, until a micro-market is chosen above.
+                <div className="grid grid-cols-1 gap-5 opacity-50 transition-opacity sm:grid-cols-2 xl:grid-cols-3">
+                  {properties.map((property, idx) => (
+                    <PropertyCard
+                      key={getPropertyId(property)}
+                      priority={idx < 3}
+                      property={property}
+                      isCompared={compareSelection.some(
+                        (item) =>
+                          getPropertyId(item) === getPropertyId(property),
+                      )}
+                      onCompareToggle={handleCompareToggle}
+                      isShortlisted={wishlistIds.some(
+                        (item) =>
+                          getPropertyId(item) === getPropertyId(property),
+                      )}
+                      onShortlistToggle={handleShortlistToggle}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-800/25 bg-white p-6 text-sm text-slate-600 shadow-sm">
+                  Choose a micro-market above to see matching properties.
+                </div>
+              )
             ) : totalProperties === 0 ? (
               <div className="space-y-8">
                 <div className="rounded-xl border border-slate-800/25 bg-white p-6 shadow-sm">
@@ -2731,42 +2902,6 @@ function PropertiesClientContent() {
                   !suggestionsLoading &&
                   suggestedProperties.length > 0 && (
                     <section className="border-t border-slate-800/25 pt-10">
-                      <div className="mb-8 overflow-hidden rounded-xl border border-[#A054A0]/20 bg-gradient-to-br from-white via-purple-50/70 to-white p-6 shadow-sm sm:p-8">
-                        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex items-start gap-3.5">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#A054A0]/10">
-                              <Sparkles className="h-5 w-5 text-[#A054A0]" />
-                            </div>
-
-                            <div>
-                              <h3 className="text-base font-bold text-slate-900 sm:text-lg">
-                                Looking for something exclusive?
-                              </h3>
-
-                              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-                                We haven&apos;t listed all available properties
-                                here. Connect with our property advisors to
-                                discover exclusive office spaces tailored to
-                                your requirements.
-                              </p>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExclusiveLeadError("");
-                              setExclusiveLeadSuccess(false);
-                              setIsExclusiveLeadOpen(true);
-                            }}
-                            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#A054A0] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#864286] focus:outline-none focus:ring-2 focus:ring-[#A054A0]/40 focus:ring-offset-2"
-                          >
-                            Find Exclusive Properties
-                            <ArrowRight className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-
                       <div className="mb-5 text-center sm:text-left">
                         <div className="flex items-center justify-center gap-2 sm:justify-start">
                           <Sparkles className="h-5 w-5 text-[#A054A0]" />
@@ -2818,6 +2953,63 @@ function PropertiesClientContent() {
           </p>
         )}
       </main>
+
+      {/* Floating card: fixed in the corner, so it takes no space on the
+          page and scrolling works as usual. Sits above the compare bar. */}
+      {!isExclusiveLeadOpen && (
+        <div
+          className={`fixed right-3 z-[85] sm:right-5 ${showSelectionBar
+            ? "bottom-[8.5rem] lg:bottom-[7.5rem]"
+            : "bottom-4 sm:bottom-5"
+            }`}
+        >
+          {exclusiveCardOpen ? (
+            <div className="relative w-[280px] max-w-[calc(100vw-1.5rem)] rounded-xl border border-[#A054A0]/20 bg-white/95 p-3.5 shadow-xl backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setExclusiveCardOpen(false)}
+                aria-label="Minimise"
+                className="absolute right-2 top-2 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+              <div className="flex items-start gap-2 pr-5">
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#A054A0]" />
+                <p className="text-[13px] font-semibold leading-5 text-slate-900">
+                  Looking for something exclusive?
+                </p>
+              </div>
+              <p className="mt-1 text-[11px] leading-[1.45] text-slate-600">
+                We haven&apos;t listed all available properties here. Connect
+                with our property advisors to discover exclusive office spaces
+                tailored to your requirements.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setExclusiveLeadError("");
+                  setExclusiveLeadSuccess(false);
+                  setIsExclusiveLeadOpen(true);
+                }}
+                className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#A054A0] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#864286] focus:outline-none focus:ring-2 focus:ring-[#A054A0]/40 focus:ring-offset-2"
+              >
+                Find Exclusive Properties
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setExclusiveCardOpen(true)}
+              aria-label="Looking for something exclusive?"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#A054A0]/25 bg-white/95 px-3.5 py-2 text-xs font-semibold text-[#A054A0] shadow-lg backdrop-blur transition hover:bg-purple-50"
+            >
+              <Sparkles className="h-4 w-4" />
+              Exclusive properties
+            </button>
+          )}
+        </div>
+      )}
 
       {showSelectionBar && (
         <div className="fixed bottom-3 left-1/2 z-[90] w-[calc(100%-1.5rem)] max-w-5xl -translate-x-1/2 rounded-xl border border-slate-400/80 bg-white/95 p-3 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:w-[calc(100%-2.5rem)] sm:p-5">
@@ -3225,23 +3417,23 @@ function PropertiesClientContent() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="exclusive-lead-title"
-            className="my-auto w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl"
+            className="my-auto w-full max-w-md overflow-visible rounded-xl bg-white shadow-2xl"
           >
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
               <div>
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-[#A054A0]">
-                  <Sparkles className="h-3.5 w-3.5" />
+                <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-semibold text-[#A054A0]">
+                  <Sparkles className="h-3 w-3" />
                   Exclusive Property Assistance
                 </div>
 
                 <h2
                   id="exclusive-lead-title"
-                  className="text-xl font-bold text-slate-900"
+                  className="text-base font-bold text-slate-900 sm:text-lg"
                 >
                   Find your ideal office space
                 </h2>
 
-                <p className="mt-2 text-sm leading-6 text-slate-500">
+                <p className="mt-1 text-xs leading-5 text-slate-500">
                   Share your contact details and our property advisors will help
                   you explore more options.
                 </p>
@@ -3252,13 +3444,13 @@ function PropertiesClientContent() {
                 onClick={closeExclusiveLeadForm}
                 disabled={isSubmittingExclusiveLead}
                 aria-label="Close exclusive properties form"
-                className="shrink-0 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                className="shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="p-5 sm:p-6">
+            <div className="px-4 py-4 sm:px-5">
               {exclusiveLeadSuccess ? (
                 <div className="py-7 text-center">
                   <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-500" />
@@ -3282,13 +3474,14 @@ function PropertiesClientContent() {
                 </div>
               ) : (
                 <form
+                  noValidate
                   onSubmit={handleExclusiveLeadSubmit}
-                  className="space-y-4"
+                  className="space-y-3"
                 >
                   <div>
                     <label
                       htmlFor="exclusive-name"
-                      className="mb-1.5 block text-sm font-medium text-slate-700"
+                      className="mb-1 block text-xs font-medium text-slate-700"
                     >
                       Full Name <span className="text-red-500">*</span>
                     </label>
@@ -3303,37 +3496,131 @@ function PropertiesClientContent() {
                       value={exclusiveLeadForm.name}
                       onChange={handleExclusiveLeadChange}
                       placeholder="Enter your full name"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10"
+                      aria-invalid={Boolean(exclusiveFieldErrors.name)}
+                      className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10 ${exclusiveFieldErrors.name ? "border-red-400" : "border-slate-200"}`}
                     />
+                    {exclusiveFieldErrors.name && (
+                      <p className="mt-1 text-xs text-red-600">{exclusiveFieldErrors.name}</p>
+                    )}
                   </div>
 
                   <div>
                     <label
                       htmlFor="exclusive-phone"
-                      className="mb-1.5 block text-sm font-medium text-slate-700"
+                      className="mb-1 block text-xs font-medium text-slate-700"
                     >
                       Phone Number <span className="text-red-500">*</span>
                     </label>
 
-                    <input
-                      id="exclusive-phone"
-                      name="phone"
-                      type="tel"
-                      autoComplete="tel"
-                      inputMode="tel"
-                      required
-                      maxLength={30}
-                      value={exclusiveLeadForm.phone}
-                      onChange={handleExclusiveLeadChange}
-                      placeholder="Enter your phone number"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10"
-                    />
+                    <div ref={exclusiveCountryRef} className="relative">
+                      <div
+                        className={`flex overflow-hidden rounded-lg border transition focus-within:border-[#A054A0] focus-within:ring-2 focus-within:ring-[#A054A0]/10 ${exclusiveFieldErrors.phone ? "border-red-400" : "border-slate-200"}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setExclusiveCountryOpen((open) => !open)}
+                          aria-haspopup="listbox"
+                          aria-expanded={exclusiveCountryOpen}
+                          aria-label={`Country code ${exclusiveCountry.name} ${exclusiveCountry.dial}`}
+                          className="flex shrink-0 items-center gap-1 border-r border-slate-200 bg-slate-50 px-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                        >
+                          <span className="text-[11px] font-semibold text-slate-500">
+                            {exclusiveCountry.code}
+                          </span>
+                          {exclusiveCountry.dial}
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform ${exclusiveCountryOpen ? "rotate-180 text-[#A054A0]" : ""}`}
+                          />
+                        </button>
+                        <input
+                          id="exclusive-phone"
+                          name="phone"
+                          type="tel"
+                          autoComplete="tel-national"
+                          inputMode="numeric"
+                          required
+                          value={exclusiveLeadForm.phone}
+                          onChange={handleExclusiveLeadChange}
+                          placeholder="Enter your phone number"
+                          aria-invalid={Boolean(exclusiveFieldErrors.phone)}
+                          className="min-w-0 flex-1 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                        />
+                      </div>
+
+                      {exclusiveCountryOpen && (
+                        <div className="absolute left-0 top-[calc(100%+6px)] z-10 w-[280px] max-w-[calc(100vw-3rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                          <div className="border-b border-slate-100 p-2">
+                            <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5">
+                              <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <input
+                                type="text"
+                                value={exclusiveCountrySearch}
+                                onChange={(e) => setExclusiveCountrySearch(e.target.value)}
+                                placeholder="Search country or code..."
+                                autoFocus
+                                className="h-8 min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                              />
+                            </div>
+                          </div>
+                          <div role="listbox" className="max-h-[200px] overflow-y-auto overscroll-contain p-1">
+                            {filteredExclusiveCountries.length > 0 ? (
+                              filteredExclusiveCountries.map((country) => {
+                                const selected =
+                                  country.code === exclusiveCountry.code &&
+                                  country.dial === exclusiveCountry.dial;
+                                return (
+                                  <button
+                                    key={`${country.code}-${country.dial}`}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={selected}
+                                    onClick={() => {
+                                      setExclusiveCountry(country);
+                                      setExclusiveCountryOpen(false);
+                                      setExclusiveCountrySearch("");
+                                      setExclusiveLeadForm((prev) => ({
+                                        ...prev,
+                                        phone: prev.phone.replace(/\D/g, "").slice(0, country.max),
+                                      }));
+                                      setExclusiveFieldErrors((prev) => ({ ...prev, phone: "" }));
+                                    }}
+                                    className={`flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm transition ${selected
+                                      ? "bg-[#A054A0] font-semibold text-white"
+                                      : "text-slate-800 hover:bg-[#A054A0]/10 hover:text-[#A054A0]"
+                                      }`}
+                                  >
+                                    <span className="flex min-w-0 items-center gap-2">
+                                      <span className="w-6 shrink-0 text-[11px] font-semibold opacity-70">
+                                        {country.code}
+                                      </span>
+                                      <span className="truncate">{country.name}</span>
+                                    </span>
+                                    <span className="flex shrink-0 items-center gap-1.5 text-xs">
+                                      {country.dial}
+                                      {selected && <Check className="h-3.5 w-3.5" />}
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <p className="px-3 py-5 text-center text-sm text-slate-500">
+                                No country found
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {exclusiveFieldErrors.phone && (
+                      <p className="mt-1 text-xs text-red-600">{exclusiveFieldErrors.phone}</p>
+                    )}
                   </div>
 
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label
                       htmlFor="exclusive-email"
-                      className="mb-1.5 block text-sm font-medium text-slate-700"
+                      className="mb-1 block text-xs font-medium text-slate-700"
                     >
                       Email Address
                     </label>
@@ -3347,14 +3634,18 @@ function PropertiesClientContent() {
                       value={exclusiveLeadForm.email}
                       onChange={handleExclusiveLeadChange}
                       placeholder="you@company.com"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10"
+                      aria-invalid={Boolean(exclusiveFieldErrors.email)}
+                      className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10 ${exclusiveFieldErrors.email ? "border-red-400" : "border-slate-200"}`}
                     />
+                    {exclusiveFieldErrors.email && (
+                      <p className="mt-1 text-xs text-red-600">{exclusiveFieldErrors.email}</p>
+                    )}
                   </div>
 
                   <div>
                     <label
                       htmlFor="exclusive-company"
-                      className="mb-1.5 block text-sm font-medium text-slate-700"
+                      className="mb-1 block text-xs font-medium text-slate-700"
                     >
                       Company Name
                     </label>
@@ -3368,14 +3659,15 @@ function PropertiesClientContent() {
                       value={exclusiveLeadForm.company}
                       onChange={handleExclusiveLeadChange}
                       placeholder="Enter your company name"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10"
                     />
+                  </div>
                   </div>
 
                   {exclusiveLeadError && (
                     <div
                       role="alert"
-                      className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700"
+                      className="rounded-lg border border-red-100 bg-red-50 p-2.5 text-xs text-red-700"
                     >
                       {exclusiveLeadError}
                     </div>
@@ -3384,7 +3676,7 @@ function PropertiesClientContent() {
                   <button
                     type="submit"
                     disabled={isSubmittingExclusiveLead}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#A054A0] px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#864286] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#A054A0] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#864286] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmittingExclusiveLead ? (
                       <>
@@ -3399,7 +3691,7 @@ function PropertiesClientContent() {
                     )}
                   </button>
 
-                  <p className="text-center text-xs leading-5 text-slate-400">
+                  <p className="text-center text-[11px] leading-4 text-slate-400">
                     Your details will be used to respond to your property
                     enquiry.
                   </p>

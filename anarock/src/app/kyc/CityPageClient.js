@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
@@ -10,8 +10,10 @@ import {
   ArrowRight,
   Building2,
   Check,
+  ChevronDown,
   GitCompare,
   Loader2,
+  Search,
   X,
 } from "lucide-react";
 
@@ -798,6 +800,50 @@ function PropertyGridItem({ property, isCompared, onCompareToggle }) {
   );
 }
 
+// Same country list as the home page requirement form.
+const PHONE_COUNTRIES = [
+  { name: "India", code: "IN", dial: "+91", flag: "🇮🇳", min: 10, max: 10 },
+  { name: "United States", code: "US", dial: "+1", flag: "🇺🇸", min: 10, max: 10 },
+  { name: "Canada", code: "CA", dial: "+1", flag: "🇨🇦", min: 10, max: 10 },
+  { name: "United Kingdom", code: "GB", dial: "+44", flag: "🇬🇧", min: 10, max: 10 },
+  { name: "United Arab Emirates", code: "AE", dial: "+971", flag: "🇦🇪", min: 9, max: 9 },
+  { name: "Australia", code: "AU", dial: "+61", flag: "🇦🇺", min: 9, max: 9 },
+  { name: "Singapore", code: "SG", dial: "+65", flag: "🇸🇬", min: 8, max: 8 },
+  { name: "Germany", code: "DE", dial: "+49", flag: "🇩🇪", min: 10, max: 11 },
+  { name: "France", code: "FR", dial: "+33", flag: "🇫🇷", min: 9, max: 9 },
+  { name: "Italy", code: "IT", dial: "+39", flag: "🇮🇹", min: 9, max: 10 },
+  { name: "Spain", code: "ES", dial: "+34", flag: "🇪🇸", min: 9, max: 9 },
+  { name: "Netherlands", code: "NL", dial: "+31", flag: "🇳🇱", min: 9, max: 9 },
+  { name: "Switzerland", code: "CH", dial: "+41", flag: "🇨🇭", min: 9, max: 9 },
+  { name: "Ireland", code: "IE", dial: "+353", flag: "🇮🇪", min: 9, max: 9 },
+  { name: "New Zealand", code: "NZ", dial: "+64", flag: "🇳🇿", min: 8, max: 10 },
+  { name: "Japan", code: "JP", dial: "+81", flag: "🇯🇵", min: 10, max: 10 },
+  { name: "South Korea", code: "KR", dial: "+82", flag: "🇰🇷", min: 9, max: 10 },
+  { name: "China", code: "CN", dial: "+86", flag: "🇨🇳", min: 11, max: 11 },
+  { name: "Hong Kong", code: "HK", dial: "+852", flag: "🇭🇰", min: 8, max: 8 },
+  { name: "Malaysia", code: "MY", dial: "+60", flag: "🇲🇾", min: 9, max: 10 },
+  { name: "Thailand", code: "TH", dial: "+66", flag: "🇹🇭", min: 9, max: 9 },
+  { name: "Israel", code: "IL", dial: "+972", flag: "🇮🇱", min: 9, max: 9 },
+  { name: "Indonesia", code: "ID", dial: "+62", flag: "🇮🇩", min: 9, max: 12 },
+  { name: "Philippines", code: "PH", dial: "+63", flag: "🇵🇭", min: 10, max: 10 },
+  { name: "Vietnam", code: "VN", dial: "+84", flag: "🇻🇳", min: 9, max: 10 },
+  { name: "South Africa", code: "ZA", dial: "+27", flag: "🇿🇦", min: 9, max: 9 },
+  { name: "Saudi Arabia", code: "SA", dial: "+966", flag: "🇸🇦", min: 9, max: 9 },
+  { name: "Qatar", code: "QA", dial: "+974", flag: "🇶🇦", min: 8, max: 8 },
+  { name: "Kuwait", code: "KW", dial: "+965", flag: "🇰🇼", min: 8, max: 8 },
+  { name: "Oman", code: "OM", dial: "+968", flag: "🇴🇲", min: 8, max: 8 },
+  { name: "Bahrain", code: "BH", dial: "+973", flag: "🇧🇭", min: 8, max: 8 },
+  { name: "Pakistan", code: "PK", dial: "+92", flag: "🇵🇰", min: 10, max: 10 },
+  { name: "Bangladesh", code: "BD", dial: "+880", flag: "🇧🇩", min: 10, max: 10 },
+  { name: "Nepal", code: "NP", dial: "+977", flag: "🇳🇵", min: 10, max: 10 },
+  { name: "Sri Lanka", code: "LK", dial: "+94", flag: "🇱🇰", min: 9, max: 9 },
+  { name: "Russia", code: "RU", dial: "+7", flag: "🇷🇺", min: 10, max: 10 },
+  { name: "Brazil", code: "BR", dial: "+55", flag: "🇧🇷", min: 10, max: 11 },
+  { name: "Mexico", code: "MX", dial: "+52", flag: "🇲🇽", min: 10, max: 10 },
+  { name: "Argentina", code: "AR", dial: "+54", flag: "🇦🇷", min: 10, max: 11 },
+  { name: "Turkey", code: "TR", dial: "+90", flag: "🇹🇷", min: 10, max: 10 },
+];
+
 const EMPTY_FORM = {
   name: "",
   company: "",
@@ -810,7 +856,40 @@ const EMPTY_FORM = {
 
 function RequirementForm({ city, micromarkets, unit }) {
   const [form, setForm] = useState(EMPTY_FORM);
+  const [phoneCountry, setPhoneCountry] = useState(PHONE_COUNTRIES[0]);
+  const [countryOpen, setCountryOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
+  const countryPickerRef = useRef(null);
   const sizeOptions = getSizeOptions(unit);
+
+  const filteredCountries = useMemo(() => {
+    const query = countrySearch.trim().toLowerCase();
+    if (!query) return PHONE_COUNTRIES;
+    return PHONE_COUNTRIES.filter((country) =>
+      `${country.name} ${country.code} ${country.dial}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [countrySearch]);
+
+  // Close the country list on an outside click or the Escape key.
+  useEffect(() => {
+    if (!countryOpen) return undefined;
+    const handlePointer = (event) => {
+      if (!countryPickerRef.current?.contains(event.target)) {
+        setCountryOpen(false);
+      }
+    };
+    const handleKey = (event) => {
+      if (event.key === "Escape") setCountryOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [countryOpen]);
 
   // Reset the chosen size when the unit changes, since the labels change.
   useEffect(() => {
@@ -833,8 +912,15 @@ function RequirementForm({ city, micromarkets, unit }) {
     if (!form.name.trim()) nextErrors.name = "Please enter your name.";
     if (!phoneDigits) {
       nextErrors.phone = "Phone number is required.";
-    } else if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
-      nextErrors.phone = "Enter a valid 10-digit mobile number.";
+    } else if (phoneCountry.code === "IN") {
+      if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
+        nextErrors.phone = "Enter a valid 10-digit mobile number.";
+      }
+    } else if (
+      phoneDigits.length < phoneCountry.min ||
+      phoneDigits.length > phoneCountry.max
+    ) {
+      nextErrors.phone = `Enter a valid ${phoneCountry.name} phone number.`;
     }
     if (
       form.email.trim() &&
@@ -871,7 +957,7 @@ function RequirementForm({ city, micromarkets, unit }) {
           name: form.name.trim(),
           company: form.company.trim(),
           email: form.email.trim(),
-          fullPhone: `+91${form.phone.replace(/\D/g, "")}`,
+          fullPhone: `${phoneCountry.dial}${form.phone.replace(/\D/g, "")}`,
           requirementCity: city,
           requirementDetails: details,
           Street: location.area || "",
@@ -953,18 +1039,33 @@ function RequirementForm({ city, micromarkets, unit }) {
           </FormField>
 
           <FormField
+            as="div"
             label="Phone"
             required
             error={errors.phone}
           >
+            <div ref={countryPickerRef} className="relative">
             <div
               className={`flex h-11 overflow-hidden rounded-lg border bg-white transition focus-within:border-[#7B2F77] focus-within:ring-2 focus-within:ring-[#7B2F77]/15 ${
                 errors.phone ? "border-red-400" : "border-[#D9DAE3]"
               }`}
             >
-              <span className="flex items-center border-r border-[#E7E7EE] bg-[#F6F6F8] px-3 text-sm font-medium text-black/75">
-                +91
-              </span>
+              <button
+                type="button"
+                onClick={() => setCountryOpen((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={countryOpen}
+                aria-label={`Country code ${phoneCountry.name} ${phoneCountry.dial}`}
+                className="flex shrink-0 items-center gap-1 border-r border-[#E7E7EE] bg-[#F6F6F8] px-3 text-sm font-medium text-black/75 transition hover:bg-[#EFEFF3]"
+              >
+                <span className="text-xs font-semibold text-black/60">
+                  {phoneCountry.code}
+                </span>
+                {phoneCountry.dial}
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${countryOpen ? "rotate-180 text-[#7B2F77]" : ""}`}
+                />
+              </button>
               <input
                 type="tel"
                 inputMode="numeric"
@@ -972,13 +1073,81 @@ function RequirementForm({ city, micromarkets, unit }) {
                 onChange={(event) =>
                   updateField(
                     "phone",
-                    event.target.value.replace(/\D/g, "").slice(0, 10),
+                    event.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, phoneCountry.max),
                   )
                 }
                 placeholder="Mobile number"
+                aria-label="Phone number"
                 autoComplete="tel-national"
                 className="min-w-0 flex-1 px-3 text-sm text-black outline-none placeholder:text-black/40"
               />
+            </div>
+
+            {countryOpen && (
+              <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[300px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-[#E7E7EE] bg-white shadow-xl">
+                <div className="border-b border-[#E7E7EE] p-2.5">
+                  <div className="flex items-center gap-2 rounded-lg border border-[#D9DAE3] px-3">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-black/40" />
+                    <input
+                      type="text"
+                      value={countrySearch}
+                      onChange={(event) => setCountrySearch(event.target.value)}
+                      placeholder="Search country or code..."
+                      autoFocus
+                      className="h-9 min-w-0 flex-1 bg-transparent text-sm text-black outline-none placeholder:text-black/40"
+                    />
+                  </div>
+                </div>
+                <div role="listbox" className="max-h-[240px] overflow-y-auto overscroll-contain p-1.5">
+                  {filteredCountries.length > 0 ? (
+                    filteredCountries.map((country) => {
+                      const selected =
+                        country.code === phoneCountry.code &&
+                        country.dial === phoneCountry.dial;
+                      return (
+                        <button
+                          key={`${country.code}-${country.dial}`}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => {
+                            setPhoneCountry(country);
+                            setCountryOpen(false);
+                            setCountrySearch("");
+                            updateField(
+                              "phone",
+                              form.phone.replace(/\D/g, "").slice(0, country.max),
+                            );
+                          }}
+                          className={`flex min-h-10 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${
+                            selected
+                              ? "bg-[#7B2F77] font-semibold text-white"
+                              : "text-black hover:bg-[#7B2F77]/10 hover:text-[#7B2F77]"
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <span className="w-6 shrink-0 text-xs font-semibold opacity-70">
+                              {country.code}
+                            </span>
+                            <span className="truncate">{country.name}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2 text-xs">
+                            {country.dial}
+                            {selected && <Check className="h-3.5 w-3.5" />}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <p className="px-3 py-6 text-center text-sm text-black/60">
+                      No country found
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
             </div>
           </FormField>
           <FormField label="Company">
@@ -1091,10 +1260,13 @@ function FormField({
   required = false,
   error,
   className = "",
+  // "div" for fields that contain buttons (a <label> would pass every click
+  // on to its first button and close the country list right away).
+  as: Wrapper = "label",
   children,
 }) {
   return (
-    <label className={`block min-w-0 ${className}`}>
+    <Wrapper className={`block min-w-0 ${className}`}>
       <span className="mb-1.5 block text-xs font-semibold text-black">
         {label}
         {required && <span className="ml-0.5 text-[#A054A0]">*</span>}
@@ -1103,7 +1275,7 @@ function FormField({
       {error && (
         <span className="mt-1 block text-xs text-red-600">{error}</span>
       )}
-    </label>
+    </Wrapper>
   );
 }
 

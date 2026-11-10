@@ -767,7 +767,7 @@ export default function Navbar() {
                       Your location
                     </span>
 
-                    <span className="block truncate text-[10px] font-semibold text-black sm:text-[13px] md:text-[14px]">
+                    <span className="block truncate text-[10px] font-semibold text-black sm:text-[13px] md:text-[14px] min-[1280px]:text-[13px] min-[1920px]:text-[14px]">
                       {userLocation?.city
                         ? `${userLocation.city}${userLocation?.state ? `, ${userLocation.state}` : ""}`
                         : userLocation?.state || "Select location"}
@@ -786,7 +786,7 @@ export default function Navbar() {
                       key={item.label}
                       type="button"
                       onClick={() => handleScrollNavigation(item.href)}
-                      className="group relative cursor-pointer whitespace-nowrap rounded-lg border-0 bg-transparent px-3 py-1.5 text-[14px] font-semibold text-black transition-all duration-200 hover:text-[#A054A0] min-[1280px]:px-2 min-[1280px]:text-[13px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px]"
+                      className="group relative cursor-pointer whitespace-nowrap rounded-lg border-0 bg-transparent px-3 py-1.5 text-[14px] font-semibold text-black transition-all duration-200 hover:text-[#A054A0] min-[1280px]:px-2 min-[1280px]:text-[12px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px]"
                     >
                       <span>{item.label}</span>
                       <span className="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-lg bg-[#A054A0] scale-x-0 transition-transform duration-200 group-hover:scale-x-100 min-[1280px]:left-2 min-[1280px]:right-2" />
@@ -807,7 +807,7 @@ export default function Navbar() {
                         type="button"
                         aria-expanded={servicesMenuOpen}
                         onClick={() => setServicesMenuOpen((prev) => !prev)}
-                        className={`group relative flex items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] font-semibold transition-all duration-200 min-[1280px]:px-2 min-[1280px]:text-[13px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px] ${servicesMenuOpen
+                        className={`group relative flex items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] font-semibold transition-all duration-200 min-[1280px]:px-2 min-[1280px]:text-[12px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px] ${servicesMenuOpen
                           ? "text-[#A054A0]"
                           : "text-black hover:text-[#A054A0]"
                           }`}
@@ -871,7 +871,7 @@ export default function Navbar() {
                     key={item.href}
                     href={item.href}
                     onClick={closeMenu}
-                    className="group relative whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] font-semibold text-black transition-all duration-200 hover:text-[#A054A0] min-[1280px]:px-2 min-[1280px]:text-[13px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px]"
+                    className="group relative whitespace-nowrap rounded-lg px-3 py-1.5 text-[14px] font-semibold text-black transition-all duration-200 hover:text-[#A054A0] min-[1280px]:px-2 min-[1280px]:text-[12px] min-[1366px]:px-2.5 min-[1920px]:px-4 min-[1920px]:py-2 min-[1920px]:text-[16px]"
                   >
                     <span>{item.label}</span>
                     <span className="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-lg bg-[#A054A0] scale-x-0 transition-transform duration-200 group-hover:scale-x-100 min-[1280px]:left-2 min-[1280px]:right-2" />
@@ -923,7 +923,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => handleUnitSelect("sq.ft")}
-                    className={`relative z-10 rounded-lg px-2.5 py-1 text-[14px] font-bold transition-all duration-200 active:scale-95 min-[1280px]:px-2 min-[1280px]:text-[14px] min-[1920px]:px-4 min-[1920px]:py-1.5 min-[1920px]:text-[16px] ${unit === "sqft"
+                    className={`relative z-10 rounded-lg px-2.5 py-1 text-[14px] font-bold transition-all duration-200 active:scale-95 min-[1280px]:px-2 min-[1280px]:text-[12px] min-[1920px]:px-4 min-[1920px]:py-1.5 min-[1920px]:text-[16px] ${unit === "sqft"
                       ? "bg-[#A054A0] text-white shadow-sm"
                       : "text-black hover:bg-white/80 hover:text-[#A054A0]"
                       }`}
@@ -934,7 +934,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => handleUnitSelect("sq.m")}
-                    className={`relative z-10 rounded-lg px-2.5 py-1 text-[14px] font-bold transition-all duration-200 active:scale-95 min-[1280px]:px-2 min-[1280px]:text-[14px] min-[1920px]:px-4 min-[1920px]:py-1.5 min-[1920px]:text-[16px] ${unit === "sqm"
+                    className={`relative z-10 rounded-lg px-2.5 py-1 text-[14px] font-bold transition-all duration-200 active:scale-95 min-[1280px]:px-2 min-[1280px]:text-[12px] min-[1920px]:px-4 min-[1920px]:py-1.5 min-[1920px]:text-[16px] ${unit === "sqm"
                       ? "bg-[#A054A0] text-white shadow-sm"
                       : "text-black hover:bg-white/80 hover:text-[#A054A0]"
                       }`}
@@ -963,7 +963,7 @@ export default function Navbar() {
                     ? `, ${wishlistCount} saved properties`
                     : ""
                     }`}
-                  className="group relative hidden h-9 shrink-0 items-center gap-1 rounded-lg border border-[#A054A0]/20 bg-white/90 px-3 text-[14px] font-semibold text-black shadow-sm backdrop-blur-md transition-all duration-200 hover:border-[#A054A0] hover:bg-white hover:text-[#A054A0] active:scale-95 min-[1280px]:inline-flex min-[1280px]:px-2.5 min-[1920px]:h-10 min-[1920px]:px-4 min-[1920px]:text-[16px]"
+                  className="group relative hidden h-9 shrink-0 items-center gap-1 rounded-lg border border-[#A054A0]/20 bg-white/90 px-3 text-[14px] font-semibold text-black shadow-sm backdrop-blur-md transition-all duration-200 hover:border-[#A054A0] hover:bg-white hover:text-[#A054A0] active:scale-95 min-[1280px]:inline-flex min-[1280px]:px-2.5 min-[1280px]:text-[12px] min-[1920px]:h-10 min-[1920px]:px-4 min-[1920px]:text-[16px]"
                 >
                   <Heart
                     size={16}
