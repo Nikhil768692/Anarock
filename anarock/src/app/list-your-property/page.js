@@ -148,20 +148,25 @@ function isValidPhone(digits, country) {
     return digits.length >= country.min && digits.length <= country.max;
 }
 
-// The location shown in the navbar ("City, State").
+// The visitor location saved by the site (same one the navbar shows).
 function getUserLocation() {
-    if (typeof window === "undefined") return "";
+    const empty = { street: "", state: "", country: "", city: "", pincode: "" };
+    if (typeof window === "undefined") return empty;
     try {
         const saved = JSON.parse(
             window.sessionStorage.getItem("anarock_user_location") || "null",
         );
-        if (!saved || typeof saved !== "object") return "";
-        return [saved.city, saved.state]
-            .map((part) => String(part || "").trim())
-            .filter(Boolean)
-            .join(", ");
+        if (!saved || typeof saved !== "object") return empty;
+        const text = (value) => String(value || "").trim();
+        return {
+            street: text(saved.area),
+            state: text(saved.state),
+            country: text(saved.country),
+            city: text(saved.city),
+            pincode: text(saved.pincode),
+        };
     } catch {
-        return "";
+        return empty;
     }
 }
 
