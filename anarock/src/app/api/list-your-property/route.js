@@ -634,8 +634,8 @@ export async function POST(request) {
             );
         }
 
-        // Validate required contact details
-        if (!form.contactName || !form.email || !form.phone) {
+        // Validate required contact details (email is optional)
+        if (!form.contactName || !form.phone) {
             return NextResponse.json(
                 {
                     success: false,
