@@ -2968,14 +2968,30 @@ function PropertiesClientContent() {
             }`}
         >
           {exclusiveCardOpen ? (
-            <div
-              title="We haven't listed all available properties here. Connect with our property advisors to discover exclusive office spaces tailored to your requirements."
-              className="flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full border border-[#A054A0]/20 bg-white/95 py-1.5 pl-3.5 pr-1.5 shadow-xl backdrop-blur"
-            >
-              <Sparkles className="h-4 w-4 shrink-0 text-[#A054A0]" />
-              <p className="whitespace-nowrap text-[13px] font-semibold text-slate-900">
-                Looking for something exclusive?
-              </p>
+            <div className="relative w-[300px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-[#A054A0]/20 bg-white/95 p-4 shadow-xl backdrop-blur sm:w-[320px]">
+              <button
+                type="button"
+                onClick={() => setExclusiveCardOpen(false)}
+                aria-label="Minimise"
+                className="absolute right-2 top-2 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+              <div className="flex items-start gap-2.5 pr-5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#A054A0]/10">
+                  <Sparkles className="h-4 w-4 text-[#A054A0]" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Looking for something exclusive?
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
+                    We haven&apos;t listed all available properties here.
+                    Connect with our property advisors to discover exclusive
+                    office spaces tailored to your requirements.
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -2983,18 +2999,10 @@ function PropertiesClientContent() {
                   setExclusiveLeadSuccess(false);
                   setIsExclusiveLeadOpen(true);
                 }}
-                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[#A054A0] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#864286] focus:outline-none focus:ring-2 focus:ring-[#A054A0]/40 focus:ring-offset-2"
+                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#A054A0] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#864286] focus:outline-none focus:ring-2 focus:ring-[#A054A0]/40 focus:ring-offset-2"
               >
                 Find Exclusive Properties
                 <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setExclusiveCardOpen(false)}
-                aria-label="Minimise"
-                className="shrink-0 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : (
