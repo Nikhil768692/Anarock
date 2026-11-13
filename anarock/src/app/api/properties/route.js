@@ -192,6 +192,7 @@ export async function GET(request) {
     const type = searchParams.get("type") || "";
     const micromarket = searchParams.get("micromarket") || "";
     const minBudget = searchParams.get("minBudget") || "";
+    const maxBudget = searchParams.get("maxBudget") || "";
     const area = searchParams.get("area") || "";
     const seats = searchParams.get("seats") || "";
     const sort = searchParams.get("sort") || "";
@@ -281,6 +282,18 @@ export async function GET(request) {
           const price = propertyPrice(property);
 
           return price !== null && price >= minimum;
+        });
+      }
+    }
+
+    if (maxBudget !== "") {
+      const maximum = parseNumber(maxBudget);
+
+      if (maximum !== null && maximum >= 0) {
+        filtered = filtered.filter((property) => {
+          const price = propertyPrice(property);
+
+          return price !== null && price <= maximum;
         });
       }
     }

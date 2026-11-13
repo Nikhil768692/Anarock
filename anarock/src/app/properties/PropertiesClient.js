@@ -1127,6 +1127,10 @@ function PropertiesClientContent() {
 
         if (sortValue) {
           params.set("sort", sortValue);
+        } else if (filters.maxBudget !== "") {
+          // With a max price, show the most expensive matches first
+          // (closest to the max), unless the visitor picked a sort.
+          params.set("sort", "budget_desc");
         }
 
         const prompt = appliedAiPrompt.trim();
@@ -2666,7 +2670,7 @@ function PropertiesClientContent() {
                       </div>
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Min Seat Price / month ({filters.currency})
+                          Max Seat Price / month ({filters.currency})
                         </label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center">
@@ -2675,11 +2679,11 @@ function PropertiesClientContent() {
                           <input
                             type="number"
                             min="0"
-                            value={filters.minBudget}
+                            value={filters.maxBudget}
                             onChange={(e) =>
-                              updateFilter("minBudget", e.target.value)
+                              updateFilter("maxBudget", e.target.value)
                             }
-                            placeholder="Min price"
+                            placeholder="Max price"
                             className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-xs font-medium text-slate-800 outline-none focus:border-[#A054A0]"
                           />
                         </div>
@@ -2689,7 +2693,7 @@ function PropertiesClientContent() {
                     <>
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Min Rent / {areaUnitLabel} / month ({filters.currency})
+                          Max Rent / {areaUnitLabel} / month ({filters.currency})
                         </label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center">
@@ -2698,11 +2702,11 @@ function PropertiesClientContent() {
                           <input
                             type="number"
                             min="0"
-                            value={filters.minBudget}
+                            value={filters.maxBudget}
                             onChange={(e) =>
-                              updateFilter("minBudget", e.target.value)
+                              updateFilter("maxBudget", e.target.value)
                             }
-                            placeholder="Min rent"
+                            placeholder="Max rent"
                             className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-xs font-medium text-slate-800 outline-none focus:border-[#A054A0]"
                           />
                         </div>
@@ -2964,25 +2968,13 @@ function PropertiesClientContent() {
             }`}
         >
           {exclusiveCardOpen ? (
-            <div className="relative w-[280px] max-w-[calc(100vw-1.5rem)] rounded-xl border border-[#A054A0]/20 bg-white/95 p-3.5 shadow-xl backdrop-blur">
-              <button
-                type="button"
-                onClick={() => setExclusiveCardOpen(false)}
-                aria-label="Minimise"
-                className="absolute right-2 top-2 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-              <div className="flex items-start gap-2 pr-5">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#A054A0]" />
-                <p className="text-[13px] font-semibold leading-5 text-slate-900">
-                  Looking for something exclusive?
-                </p>
-              </div>
-              <p className="mt-1 text-[11px] leading-[1.45] text-slate-600">
-                We haven&apos;t listed all available properties here. Connect
-                with our property advisors to discover exclusive office spaces
-                tailored to your requirements.
+            <div
+              title="We haven't listed all available properties here. Connect with our property advisors to discover exclusive office spaces tailored to your requirements."
+              className="flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full border border-[#A054A0]/20 bg-white/95 py-1.5 pl-3.5 pr-1.5 shadow-xl backdrop-blur"
+            >
+              <Sparkles className="h-4 w-4 shrink-0 text-[#A054A0]" />
+              <p className="whitespace-nowrap text-[13px] font-semibold text-slate-900">
+                Looking for something exclusive?
               </p>
               <button
                 type="button"
@@ -2991,10 +2983,18 @@ function PropertiesClientContent() {
                   setExclusiveLeadSuccess(false);
                   setIsExclusiveLeadOpen(true);
                 }}
-                className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#A054A0] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#864286] focus:outline-none focus:ring-2 focus:ring-[#A054A0]/40 focus:ring-offset-2"
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[#A054A0] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#864286] focus:outline-none focus:ring-2 focus:ring-[#A054A0]/40 focus:ring-offset-2"
               >
                 Find Exclusive Properties
                 <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setExclusiveCardOpen(false)}
+                aria-label="Minimise"
+                className="shrink-0 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : (

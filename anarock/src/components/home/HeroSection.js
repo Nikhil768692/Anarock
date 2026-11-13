@@ -375,13 +375,15 @@ export default function HeroSection({ consentGranted, locationData }) {
         params.set("type", toUrlValue(officeType));
       }
 
-      const cleanedMinBudget = cleanNumber(minBudget);
+      // The rent / seat price typed here is the most the visitor wants to
+      // pay, so it is sent as the max price filter of the properties page.
+      const cleanedBudget = cleanNumber(minBudget);
 
-      if (cleanedMinBudget) {
-        params.set("minBudget", cleanedMinBudget);
+      if (cleanedBudget) {
+        params.set("maxBudget", cleanedBudget);
       }
 
-      params.delete("maxBudget");
+      params.delete("minBudget");
 
       if (isCoworking) {
         const cleanedSeats = cleanNumber(seats);
