@@ -1362,7 +1362,6 @@ function Field({
                     onChange={(event) => onChange(event.target.value)}
                     className={[
                         "h-12 w-full rounded-xl border bg-white/85 px-4 text-sm outline-none shadow-[0_6px_25px_rgba(15,23,42,0.03)] backdrop-blur transition-all",
-                        icon ? "pl-11" : "",
                         suffix ? "pr-20" : "",
                         error
                             ? "border-red-300 focus:border-red-400"

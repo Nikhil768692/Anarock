@@ -628,11 +628,8 @@ export default function ComparePage() {
                   <div
                     className={`grid ${gridColumnsClass} gap-5 pb-6 transition-all duration-300`}
                   >
-                    <div className="flex flex-col justify-end pb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-black">
-                        Properties Overview
-                      </span>
-                    </div>
+                    {/* Empty first column keeps the cards aligned with the table columns. */}
+                    <div aria-hidden="true" />
 
                     {slots.map((property, index) => {
                       if (property) {
@@ -750,6 +747,10 @@ export default function ComparePage() {
                       );
                     })}
                   </div>
+
+                  <h2 className="mb-4 text-lg font-bold uppercase tracking-wider text-[#A054A0] sm:text-xl lg:text-2xl">
+                    Properties Overview
+                  </h2>
 
                   {/* Specification Table */}
                   <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">

@@ -761,7 +761,8 @@ export default function HomePage() {
       }
     };
 
-    loadFaqs();
+    // FAQ section is hidden, so the FAQs are not loaded. Uncomment to load them again.
+    // loadFaqs();
     return () => controller.abort();
   }, []);
 
@@ -1204,7 +1205,7 @@ export default function HomePage() {
             </motion.div>
           </div>
         )}
-        {/* FAQ */}
+        {/* FAQ section hidden for now. Remove this comment wrapper to show it again.
         <section className="py-10 sm:py-12">
           <div className="mx-auto max-w-[1200px] px-5 sm:px-8">
             <SectionHeading>Frequently Asked Questions</SectionHeading>
@@ -1247,6 +1248,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+        */}
       </div>
 
       <CookieConsent
