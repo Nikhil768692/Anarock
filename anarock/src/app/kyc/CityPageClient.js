@@ -195,6 +195,7 @@ export default function CityPageClient({ city }) {
   const [loadingProperties, setLoadingProperties] = useState(true);
   const [propertyError, setPropertyError] = useState("");
   const [cityData, setCityData] = useState({
+    heroTitle: "",
     advisor: null,
     market: null,
     micromarkets: [],
@@ -250,6 +251,7 @@ export default function CityPageClient({ city }) {
         if (cancelled) return;
         if (response.ok && json?.success) {
           setCityData({
+            heroTitle: typeof json.heroTitle === "string" ? json.heroTitle.trim() : "",
             advisor: json.advisor || null,
             market: json.market || null,
             micromarkets: Array.isArray(json.micromarkets)
@@ -323,13 +325,11 @@ export default function CityPageClient({ city }) {
 
     if (tableRows.length > 0) {
       return tableRows.map((row) => {
-        const match =
-          counts.get(normalizeMicromarket(row.propertyMicromarket)) ||
-          counts.get(normalizeMicromarket(row.name));
+        const match = counts.get(normalizeMicromarket(row.name));
 
         return {
           name: row.name,
-          filterName: match?.name || row.propertyMicromarket || row.name,
+          filterName: match?.name || row.name,
           count: match?.count || 0,
           rentMin: row.rentMin,
           rentMax: row.rentMax,
@@ -427,7 +427,12 @@ export default function CityPageClient({ city }) {
               Commercial office space · {city}
             </p>
             <h1 className="mt-4 max-w-[640px] text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-black sm:text-[42px] lg:text-[48px]">
-              {HERO_TITLE}
+              {loadingCityData ? (
+                // Keeps the space while the heading loads, so nothing jumps.
+                <span className="invisible">{HERO_TITLE}</span>
+              ) : (
+                cityData.heroTitle || HERO_TITLE
+              )}
             </h1>
             <p className="mt-5 max-w-[560px] text-[15px] leading-7 text-black/75 sm:text-base">
               {countLabel} verified Grade A buildings across {city}’s key
@@ -436,11 +441,14 @@ export default function CityPageClient({ city }) {
             </p>
           </div>
 
-          <AdvisorCard
-            city={city}
-            advisor={cityData.advisor}
-            loading={loadingCityData}
-          />
+          {/* Same top space as the text on the left, so both start level. */}
+          <div className="min-w-0 lg:pt-6">
+            <AdvisorCard
+              city={city}
+              advisor={cityData.advisor}
+              loading={loadingCityData}
+            />
+          </div>
         </div>
       </section>
 
@@ -660,14 +668,13 @@ function AdvisorCard({ city, advisor, loading }) {
 
   if (!advisor) return null;
 
-  const subtitle = [
-    advisor.designation,
-    Number.isFinite(advisor.experienceYears)
-      ? `${advisor.experienceYears} yrs in ${city}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // For example "Senior Property Advisor with 8 yrs of experience".
+  const experience = Number.isFinite(advisor.experienceYears)
+    ? `${advisor.experienceYears} ${advisor.experienceYears === 1 ? "yr" : "yrs"} of experience`
+    : "";
+  const subtitle = advisor.designation
+    ? [advisor.designation, experience].filter(Boolean).join(" with ")
+    : experience;
 
   return (
     <aside className="w-full rounded-2xl border border-[#E7E7EE] bg-white p-6 shadow-[0_6px_24px_rgba(28,35,64,0.06)]">
@@ -731,7 +738,7 @@ function MarketSection({
         ? `${formatNumber(market.vacancyPercent)}%`
         : "—",
       note: hasChange
-        ? `${change > 0 ? "▲" : change < 0 ? "▼" : "•"} ${formatNumber(Math.abs(change))} pts vs last quarter`
+        ? `${formatNumber(change)} pts vs last quarter`
         : "",
     },
     {

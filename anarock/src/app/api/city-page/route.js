@@ -154,9 +154,8 @@ function mapMarketStats(row) {
 }
 
 // One row per micro-market. Rent is in INR per sq ft per month.
-// PropertyMicromarket is optional: fill it only when the micro-market name
-// used on the properties is different from MicromarketName
-// (for example "BLR CBD" on properties and "CBD" on the city page).
+// MicromarketName must be written exactly as on the properties
+// (for example "BLR CBD"), so the property count and the link match.
 function mapMicromarkets(rows, city) {
   const target = normalizeCity(city);
   const byName = new Map();
@@ -171,7 +170,6 @@ function mapMicromarkets(rows, city) {
 
       byName.set(key, {
         name,
-        propertyMicromarket: toText(getField(row, "PropertyMicromarket")),
         rentMin: toNumber(getField(row, "RentMin")),
         rentMax: toNumber(getField(row, "RentMax")),
         sortOrder: toNumber(getField(row, "SortOrder")),
@@ -217,12 +215,19 @@ export async function GET(request) {
     settle(getCachedRows(MICROMARKETS_TABLE), MICROMARKETS_TABLE),
   ]);
 
+  const advisorRow = advisorRows
+    ? pickLatestRowForCity(advisorRows, city)
+    : null;
+
   return NextResponse.json(
     {
       success: true,
       city,
+      // Optional HeroTitle column in CityAdvisors: the big heading on the
+      // city page. Empty means the page uses its default heading.
+      heroTitle: toText(getField(advisorRow, "HeroTitle")),
       advisor: advisorRows
-        ? mapAdvisor(pickLatestRowForCity(advisorRows, city))
+        ? mapAdvisor(advisorRow)
         : null,
       market: marketRows
         ? mapMarketStats(pickLatestRowForCity(marketRows, city))
