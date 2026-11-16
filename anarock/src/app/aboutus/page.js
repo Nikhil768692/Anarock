@@ -74,7 +74,7 @@ const companyJourney = [
         year: "2017",
         detail: (
             <>
-                <strong>Inception</strong> of ANAROCK
+                <strong>Inception</strong> of Anarock
             </>
         ),
     },
@@ -300,18 +300,6 @@ export default function AboutUsPage() {
                 </div>
             </section>
 
-            {/* Market statistics */}
-            <section aria-label="Commercial real estate market statistics" className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-                <div className="mx-auto w-full max-w-[1600px] min-w-0">
-                    <div className="mb-6 px-1 sm:px-2 lg:px-4">
-                        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                            Commercial real estate at a glance
-                        </h2>
-                    </div>
-                    <MarketStats />
-                </div>
-            </section>
-
             {/* Company statistics */}
             <section className="border-y border-[#eae6eb] bg-[#f8f7f8] px-4 py-12 sm:px-6 sm:py-16 md:px-8 lg:px-12 lg:py-20 xl:px-16">
                 <div className="mx-auto w-full max-w-[1280px] min-w-0">
@@ -407,7 +395,7 @@ export default function AboutUsPage() {
                         </h2>
                         <p className="mt-5 max-w-lg text-sm leading-7 text-black sm:text-base sm:leading-8">
                             A journey of expansion, innovation and new opportunities
-                            shaping ANAROCK&apos;s evolution.
+                            shaping Anarock&apos;s evolution.
                         </p>
                     </motion.div>
                     <div className="relative hidden xl:block">
@@ -554,7 +542,17 @@ export default function AboutUsPage() {
                 </div>
             </section>
 
-
+            {/* Market statistics */}
+            <section aria-label="Commercial real estate market statistics" className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+                <div className="mx-auto w-full max-w-[1600px] min-w-0">
+                    <div className="mb-6 px-1 sm:px-2 lg:px-4">
+                        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                            Commercial real estate at a glance
+                        </h2>
+                    </div>
+                    <MarketStats />
+                </div>
+            </section>
 
             {/* Global partners */}
             <section className="px-4 py-12 sm:px-6 sm:py-16 md:px-8 lg:px-12 lg:py-20 xl:px-16">
@@ -621,13 +619,16 @@ export default function AboutUsPage() {
                                         className={`relative flex h-[220px] w-full items-end justify-center overflow-hidden rounded-xl border border-slate-500/20 xs:h-[250px] sm:h-[280px] lg:col-span-5 lg:h-[320px] ${isEven ? "lg:order-1" : "lg:order-2"
                                             }`}
                                     >
+                                        {/* The original file is shown (no re-compression) and never
+                                            stretched past its own size, so it stays sharp. For a sharper
+                                            photo on large screens, use a file of at least 600px. */}
                                         <Image
                                             src={leader.image}
                                             alt={leader.name}
                                             width={300}
                                             height={300}
-                                            sizes="(max-width: 1023px) 100vw, 360px"
-                                            className="relative z-10 h-[200px] w-full max-w-[260px] object-cover object-bottom transition-transform duration-500 group-hover:scale-105 sm:h-[240px] lg:h-[290px]"
+                                            unoptimized
+                                            className="relative z-10 h-auto max-h-[200px] w-auto max-w-full object-contain object-bottom transition-transform duration-500 group-hover:scale-[1.02] sm:max-h-[240px] lg:max-h-[290px]"
                                         />
                                     </div>
 

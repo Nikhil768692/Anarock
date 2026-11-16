@@ -39,7 +39,7 @@ const ADVISOR_CALLBACK_HOURS = 24;
 
 const FORM_BENEFITS = [
   "Off-market and pre-lease options",
-  "Rental benchmarks from ANAROCK Research",
+  "Rental benchmarks from Anarock Research",
   "Negotiation and term-sheet support",
 ];
 
@@ -444,7 +444,7 @@ export default function CityPageClient({ city }) {
                 // Keeps the space while the text loads, so nothing jumps.
                 <span className="invisible">
                   {countLabel} verified Grade A buildings across {city}’s key
-                  micro-markets, with live rentals from ANAROCK Research and
+                  micro-markets, with live rentals from Anarock Research and
                   advisors who close deals here every week.
                 </span>
               ) : cityData.heroDescription ? (
@@ -452,7 +452,7 @@ export default function CityPageClient({ city }) {
               ) : (
                 <>
                   {countLabel} verified Grade A buildings across {city}’s key
-                  micro-markets, with live rentals from ANAROCK Research and
+                  micro-markets, with live rentals from Anarock Research and
                   advisors who close deals here every week.
                 </>
               )}

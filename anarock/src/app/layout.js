@@ -19,8 +19,8 @@ export const metadata = {
   metadataBase: new URL(SITE_URL),
 
   title: {
-    default: "ANAROCK | Premium Commercial Real Estate in India",
-    template: "%s | ANAROCK",
+    default: "Anarock | Premium Commercial Real Estate in India",
+    template: "%s | Anarock",
   },
 
   description:
@@ -30,18 +30,18 @@ export const metadata = {
     "commercial real estate",
     "office space",
     "coworking",
-    "ANAROCK",
+    "Anarock",
     "Mumbai office",
     "Bengaluru office",
     "commercial property India",
   ],
 
-  authors: [{ name: "ANAROCK" }],
+  authors: [{ name: "Anarock" }],
 
   openGraph: {
     type: "website",
-    siteName: "ANAROCK",
-    title: "ANAROCK | Premium Commercial Real Estate in India",
+    siteName: "Anarock",
+    title: "Anarock | Premium Commercial Real Estate in India",
     description:
       "Explore commercial real estate and office spaces across India's leading business markets.",
     images: [
@@ -49,7 +49,7 @@ export const metadata = {
         url: "/images/anarock-home-og.jpg",
         width: 1200,
         height: 630,
-        alt: "ANAROCK commercial real estate",
+        alt: "Anarock commercial real estate",
       },
     ],
     locale: "en_IN",
@@ -57,7 +57,7 @@ export const metadata = {
 
   twitter: {
     card: "summary_large_image",
-    title: "ANAROCK | Premium Commercial Real Estate",
+    title: "Anarock | Premium Commercial Real Estate",
     description:
       "Explore commercial office spaces and coworking environments across India.",
     images: ["/images/anarock-home-og.jpg"],
@@ -86,7 +86,7 @@ export default function RootLayout({ children }) {
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "RealEstateAgent",
-    name: "ANAROCK",
+    name: "Anarock",
     url: `${SITE_URL}/`,
     logo: `${SITE_URL}/logo.png`,
     description:

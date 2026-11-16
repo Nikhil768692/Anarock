@@ -400,9 +400,10 @@ function SectionHeading({ children, subtitle, className = "" }) {
   );
 }
 
-function ServicePattern({ children, className = "" }) {
+function ServicePattern({ children, className = "", id }) {
   return (
     <section
+      id={id}
       className={`relative overflow-hidden bg-[#F7F7F7] ${className}`}
       style={{
         backgroundImage:
@@ -454,10 +455,11 @@ function CommercialLeasingAndAdvisoryPageContent() {
   const serviceSlugToIndex = {
     "leasing-services": 0,
     "transaction-management": 1,
-    "advisory-services": 2,
+        "advisory-services": 2,
+    "enterprise-advisory-solutions": 3,
+    // Older links used this name for the Enterprise Advisory Solutions tab.
     "gcc-calculator": 3,
   };
-
   const requestedService = searchParams.get("service");
   const [activeService, setActiveService] = useState(0);
   useEffect(() => {
@@ -491,7 +493,10 @@ function CommercialLeasingAndAdvisoryPageContent() {
     };
   }, []);
 
-  useEffect(() => {
+   useEffect(() => {
+    // Only a ?service= link picks the tab here. Without it, keep the tab
+    // chosen from the navbar menu (set by the effect above).
+    if (!requestedService) return;
     setActiveService(serviceSlugToIndex[requestedService] ?? 0);
   }, [requestedService]);
   const [openFaq, setOpenFaq] = useState(null);

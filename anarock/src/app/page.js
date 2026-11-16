@@ -5,9 +5,9 @@ const SITE_URL = (
 ).replace(/\/+$/, "");
 
 export const metadata = {
-  title: "Commercial Office Space for Rent in India | ANAROCK",
+  title: "Commercial Office Space for Rent in India | Anarock",
   description:
-    "Explore commercial office spaces, business parks and coworking spaces for rent across Mumbai, Gurugram, Delhi NCR, Bengaluru, Pune and other major Indian cities with ANAROCK.",
+    "Explore commercial office spaces, business parks and coworking spaces for rent across Mumbai, Gurugram, Delhi NCR, Bengaluru, Pune and other major Indian cities with Anarock.",
 
   keywords: [
     "commercial office space for rent in India",
@@ -27,8 +27,8 @@ export const metadata = {
   openGraph: {
     type: "website",
     url: SITE_URL,
-    siteName: "ANAROCK",
-    title: "Commercial Office Space for Rent in India | ANAROCK",
+    siteName: "Anarock",
+    title: "Commercial Office Space for Rent in India | Anarock",
     description:
       "Discover office spaces, commercial properties and coworking environments across India's leading business markets.",
     images: [
@@ -36,14 +36,14 @@ export const metadata = {
         url: "/images/anarock-home-og.jpg",
         width: 1200,
         height: 630,
-        alt: "ANAROCK commercial real estate",
+        alt: "Anarock commercial real estate",
       },
     ],
   },
 
   twitter: {
     card: "summary_large_image",
-    title: "Commercial Office Space for Rent in India | ANAROCK",
+    title: "Commercial Office Space for Rent in India | Anarock",
     description:
       "Explore commercial office spaces and coworking environments across India.",
     images: ["/images/anarock-home-og.jpg"],
@@ -65,7 +65,7 @@ export const metadata = {
 const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "ANAROCK",
+  name: "Anarock",
   url: `${SITE_URL}/`,
   description:
     "Explore commercial office spaces, coworking spaces and managed offices across India.",
@@ -75,13 +75,13 @@ const websiteJsonLd = {
 const webpageJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebPage",
-  name: "Commercial Office Space for Rent in India | ANAROCK",
+  name: "Commercial Office Space for Rent in India | Anarock",
   url: `${SITE_URL}/`,
   description:
     "Discover and compare commercial real estate and office spaces across India's leading business destinations.",
   isPartOf: {
     "@type": "WebSite",
-    name: "ANAROCK",
+    name: "Anarock",
     url: `${SITE_URL}/`,
   },
   inLanguage: "en-IN",

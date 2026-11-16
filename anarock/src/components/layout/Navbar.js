@@ -148,8 +148,14 @@ const mainServices = [
     slug: "advisory-services",
   },
   {
+    title: "Enterprise Advisory Solutions",
+    slug: "enterprise-advisory-solutions",
+  },
+  {
+    // Opens its own page instead of a tab on /services.
     title: "GCC Calculator",
     slug: "gcc-calculator",
+    href: "/gcc-calculator",
   },
 ];
 
@@ -202,7 +208,14 @@ export default function Navbar() {
     setPreferences({ currency: currencyCode, unit: normalizedUnit });
   };
 
-  const handleServiceNavigation = (slug) => {
+  const handleServiceNavigation = (service) => {
+    if (service.href) {
+      closeMenu();
+      window.location.href = service.href;
+      return;
+    }
+
+    const slug = service.slug;
     sessionStorage.setItem("anarock_selected_service", slug);
 
     closeMenu();
@@ -832,7 +845,7 @@ export default function Navbar() {
                                   key={service.slug}
                                   type="button"
                                   onClick={() =>
-                                    handleServiceNavigation(service.slug)
+                                    handleServiceNavigation(service)
                                   }
                                   className="group/item flex items-center justify-between rounded-lg px-3.5 py-2.5 transition-all duration-150 hover:bg-[#A054A0]/10"
                                 >
@@ -1037,7 +1050,7 @@ export default function Navbar() {
                                 key={service.slug}
                                 type="button"
                                 onClick={() =>
-                                  handleServiceNavigation(service.slug)
+                                  handleServiceNavigation(service)
                                 }
                                 className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-medium text-black hover:bg-[#A054A0]/10 hover:text-[#A054A0]"
                               >
