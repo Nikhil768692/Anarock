@@ -125,6 +125,32 @@ function pickLatestRowForCity(rows, city) {
   );
 }
 
+// A WorkDrive download link (".../external/<id>/download") opens a download
+// page. Adding ?directDownload=true makes it return the file itself, so it
+// can be shown as an image. Other links are used as they are.
+function toPhotoUrl(value) {
+  const text = toText(value);
+  if (!text) return "";
+
+  try {
+    const url = new URL(text);
+    const isWorkDrive = /(^|\.)workdrive\.zohoexternal\./i.test(url.hostname);
+
+    if (
+      isWorkDrive &&
+      /\/external\/[^/]+\/download\/?$/i.test(url.pathname) &&
+      !url.searchParams.has("directDownload")
+    ) {
+      url.searchParams.set("directDownload", "true");
+      return url.toString();
+    }
+  } catch {
+    // Not a full address; use it as it is.
+  }
+
+  return text;
+}
+
 function mapAdvisor(row) {
   if (!row) return null;
 
@@ -135,7 +161,7 @@ function mapAdvisor(row) {
     name,
     designation: toText(getField(row, "Designation")),
     experienceYears: toNumber(getField(row, "ExperienceYears")),
-    photoUrl: toText(getField(row, "PhotoUrl")),
+    photoUrl: toPhotoUrl(getField(row, "PhotoUrl")),
   };
 }
 
@@ -226,6 +252,9 @@ export async function GET(request) {
       // Optional HeroTitle column in CityAdvisors: the big heading on the
       // city page. Empty means the page uses its default heading.
       heroTitle: toText(getField(advisorRow, "HeroTitle")),
+      // Optional HeroDescription column in CityAdvisors: the text under the
+      // heading, shown exactly as written. Empty means the default text.
+      heroDescription: toText(getField(advisorRow, "HeroDescription")),
       advisor: advisorRows
         ? mapAdvisor(advisorRow)
         : null,

@@ -342,6 +342,61 @@ function getStoredUserLocation() {
   }
 }
 
+// Number box for the filter panel. Typing only changes the box; the filter
+// (and the search) runs once the visitor stops typing for a moment, presses
+// Enter or leaves the box, instead of on every key.
+const FILTER_TYPING_DELAY_MS = 700;
+
+function FilterNumberInput({ value, onCommit, ...inputProps }) {
+  const [draft, setDraft] = useState(value ?? "");
+  const timerRef = useRef(null);
+  const committedRef = useRef(value ?? "");
+
+  // Follow outside changes (chip removed, Clear all, back button). The value
+  // this box just sent is skipped, so text typed meanwhile is kept.
+  useEffect(() => {
+    const nextValue = value ?? "";
+    if (String(nextValue) === String(committedRef.current)) return;
+    committedRef.current = nextValue;
+    clearTimeout(timerRef.current);
+    setDraft(nextValue);
+  }, [value]);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const commit = (nextValue) => {
+    clearTimeout(timerRef.current);
+    if (String(nextValue) === String(committedRef.current)) return;
+    committedRef.current = nextValue;
+    onCommit(nextValue);
+  };
+
+  return (
+    <input
+      {...inputProps}
+      type="number"
+      min="0"
+      value={draft}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        setDraft(nextValue);
+        clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(
+          () => commit(nextValue),
+          FILTER_TYPING_DELAY_MS,
+        );
+      }}
+      onBlur={() => commit(draft)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit(draft);
+        }
+      }}
+    />
+  );
+}
+
 function PropertiesClientContent() {
   const { currency, unit, exchangeRates } = usePreferences();
   const [suggestionsHasMore, setSuggestionsHasMore] = useState(false);
@@ -2393,7 +2448,7 @@ function PropertiesClientContent() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[240px_1fr] lg:gap-5 xl:grid-cols-[280px_1fr] xl:gap-8">
           <aside
             className={
               showFilters
@@ -2656,12 +2711,10 @@ function PropertiesClientContent() {
                         </label>
                         <div className="relative">
                           <Users className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            type="number"
-                            min="0"
+                          <FilterNumberInput
                             value={filters.seats}
-                            onChange={(e) =>
-                              updateFilter("seats", e.target.value)
+                            onCommit={(nextValue) =>
+                              updateFilter("seats", nextValue)
                             }
                             placeholder="e.g. 50"
                             className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-xs font-medium text-slate-800 outline-none focus:border-[#A054A0]"
@@ -2676,12 +2729,10 @@ function PropertiesClientContent() {
                           <span className="absolute left-3.5 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center">
                             {renderCurrencyIcon()}
                           </span>
-                          <input
-                            type="number"
-                            min="0"
+                          <FilterNumberInput
                             value={filters.maxBudget}
-                            onChange={(e) =>
-                              updateFilter("maxBudget", e.target.value)
+                            onCommit={(nextValue) =>
+                              updateFilter("maxBudget", nextValue)
                             }
                             placeholder="Max price"
                             className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-xs font-medium text-slate-800 outline-none focus:border-[#A054A0]"
@@ -2699,12 +2750,10 @@ function PropertiesClientContent() {
                           <span className="absolute left-3.5 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center">
                             {renderCurrencyIcon()}
                           </span>
-                          <input
-                            type="number"
-                            min="0"
+                          <FilterNumberInput
                             value={filters.maxBudget}
-                            onChange={(e) =>
-                              updateFilter("maxBudget", e.target.value)
+                            onCommit={(nextValue) =>
+                              updateFilter("maxBudget", nextValue)
                             }
                             placeholder="Max rent"
                             className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-xs font-medium text-slate-800 outline-none focus:border-[#A054A0]"
@@ -2717,12 +2766,10 @@ function PropertiesClientContent() {
                         </label>
                         <div className="relative">
                           <Maximize2 className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            type="number"
-                            min="0"
+                          <FilterNumberInput
                             value={filters.area}
-                            onChange={(e) =>
-                              updateFilter("area", e.target.value)
+                            onCommit={(nextValue) =>
+                              updateFilter("area", nextValue)
                             }
                             placeholder="e.g. 2000"
                             className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-xs font-medium text-slate-800 outline-none focus:border-[#A054A0]"
@@ -2745,7 +2792,7 @@ function PropertiesClientContent() {
 
           <div className="min-w-0 flex-1">
             {loading ? (
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1080px]:grid-cols-3">
                 {[...Array(6)].map((_, idx) => (
                   <PropertyCardSkeleton key={idx} />
                 ))}
@@ -2761,7 +2808,7 @@ function PropertiesClientContent() {
             ) : aiClarification ? (
               properties.length > 0 ? (
                 // Earlier cards, faded, until a micro-market is chosen above.
-                <div className="grid grid-cols-1 gap-5 opacity-50 transition-opacity sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 opacity-50 transition-opacity sm:grid-cols-2 min-[1080px]:grid-cols-3">
                   {properties.map((property, idx) => (
                     <PropertyCard
                       key={getPropertyId(property)}
@@ -2798,7 +2845,7 @@ function PropertiesClientContent() {
                 </div>
 
                 {searchCompleted && suggestionsLoading ? (
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1080px]:grid-cols-3">
                     {[...Array(3)].map((_, idx) => (
                       <PropertyCardSkeleton key={idx} />
                     ))}
@@ -2811,7 +2858,7 @@ function PropertiesClientContent() {
                         Other properties you may consider
                       </h3>
                     </div>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1080px]:grid-cols-3">
                       {suggestedProperties.map((property, idx) => (
                         <PropertyCard
                           key={getPropertyId(property)}
@@ -2834,7 +2881,7 @@ function PropertiesClientContent() {
               </div>
             ) : (
               <div className="space-y-10">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1080px]:grid-cols-3">
                   {properties.map((property, idx) => (
                     <PropertyCard
                       key={getPropertyId(property)}
@@ -2919,7 +2966,7 @@ function PropertiesClientContent() {
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1080px]:grid-cols-3">
                         {suggestedProperties.map((property) => {
                           const propertyId = getPropertyId(property);
                           return (

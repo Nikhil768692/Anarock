@@ -196,6 +196,7 @@ export default function CityPageClient({ city }) {
   const [propertyError, setPropertyError] = useState("");
   const [cityData, setCityData] = useState({
     heroTitle: "",
+    heroDescription: "",
     advisor: null,
     market: null,
     micromarkets: [],
@@ -252,6 +253,10 @@ export default function CityPageClient({ city }) {
         if (response.ok && json?.success) {
           setCityData({
             heroTitle: typeof json.heroTitle === "string" ? json.heroTitle.trim() : "",
+            heroDescription:
+              typeof json.heroDescription === "string"
+                ? json.heroDescription.trim()
+                : "",
             advisor: json.advisor || null,
             market: json.market || null,
             micromarkets: Array.isArray(json.micromarkets)
@@ -435,9 +440,22 @@ export default function CityPageClient({ city }) {
               )}
             </h1>
             <p className="mt-5 max-w-[560px] text-[15px] leading-7 text-black/75 sm:text-base">
-              {countLabel} verified Grade A buildings across {city}’s key
-              micro-markets, with live rentals from ANAROCK Research and
-              advisors who close deals here every week.
+              {loadingCityData ? (
+                // Keeps the space while the text loads, so nothing jumps.
+                <span className="invisible">
+                  {countLabel} verified Grade A buildings across {city}’s key
+                  micro-markets, with live rentals from ANAROCK Research and
+                  advisors who close deals here every week.
+                </span>
+              ) : cityData.heroDescription ? (
+                cityData.heroDescription
+              ) : (
+                <>
+                  {countLabel} verified Grade A buildings across {city}’s key
+                  micro-markets, with live rentals from ANAROCK Research and
+                  advisors who close deals here every week.
+                </>
+              )}
             </p>
           </div>
 
@@ -650,6 +668,14 @@ export default function CityPageClient({ city }) {
 /* ------------------------------------------------------------------ */
 
 function AdvisorCard({ city, advisor, loading }) {
+  // When the photo link does not give an image, show the initials instead
+  // of a broken image.
+  const photoUrl = advisor?.photoUrl || "";
+  const [photoFailed, setPhotoFailed] = useState(false);
+  useEffect(() => {
+    setPhotoFailed(false);
+  }, [photoUrl]);
+
   if (loading) {
     return (
       <div className="w-full animate-pulse rounded-2xl border border-[#E7E7EE] bg-white p-6 shadow-sm">
@@ -683,11 +709,12 @@ function AdvisorCard({ city, advisor, loading }) {
       </p>
 
       <div className="mt-4 flex items-center gap-3">
-        {advisor.photoUrl ? (
+        {photoUrl && !photoFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={advisor.photoUrl}
+            src={photoUrl}
             alt={advisor.name}
+            onError={() => setPhotoFailed(true)}
             className="h-12 w-12 shrink-0 rounded-full object-cover"
           />
         ) : (
@@ -710,6 +737,16 @@ function AdvisorCard({ city, advisor, loading }) {
       <p className="mt-4 text-sm leading-6 text-black/75">{ADVISOR_BLURB}</p>
     </aside>
   );
+}
+
+// Font size that keeps one line of text inside its card: the normal size,
+// or smaller when the text is long for the card's width (cqw = card width).
+// charWidth is the average letter width in em for that font weight.
+function fitOneLine(text, maxSize, charWidth) {
+  const length = Math.max(String(text ?? "").length, 1);
+  return {
+    fontSize: `min(${maxSize}, calc(100cqw / ${(length * charWidth).toFixed(2)}))`,
+  };
 }
 
 function MarketSection({
@@ -772,18 +809,33 @@ function MarketSection({
           {stats.map((stat) => (
             <div
               key={stat.label}
+              style={{ containerType: "inline-size" }}
               className="min-w-0 rounded-xl border border-[#E7E7EE] bg-white p-4 shadow-[0_4px_16px_rgba(0,0,0,0.04)] sm:p-5"
             >
-              <p className="text-xs text-black/75">{stat.label}</p>
+              <p
+                title={stat.label}
+                style={fitOneLine(stat.label, "0.75rem", 0.56)}
+                className="truncate whitespace-nowrap text-black/75"
+              >
+                {stat.label}
+              </p>
               {loading ? (
                 <div className="mt-2 h-8 w-20 animate-pulse rounded bg-black/10" />
               ) : (
-                <p className="mt-1.5 truncate text-[24px] font-bold leading-tight sm:text-[28px]">
+                <p
+                  title={typeof stat.value === "string" ? stat.value : undefined}
+                  style={fitOneLine(stat.value, "var(--stat-value-size)", 0.64)}
+                  className="mt-1.5 truncate whitespace-nowrap font-bold leading-tight [--stat-value-size:24px] sm:[--stat-value-size:28px]"
+                >
                   {stat.value}
                 </p>
               )}
               {stat.note && (
-                <p className="mt-1 text-[11px] leading-4 text-black/75">
+                <p
+                  title={typeof stat.note === "string" ? stat.note : undefined}
+                  style={fitOneLine(stat.note, "11px", 0.56)}
+                  className="mt-1 truncate whitespace-nowrap leading-4 text-black/75"
+                >
                   {stat.note}
                 </p>
               )}

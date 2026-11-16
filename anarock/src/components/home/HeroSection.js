@@ -21,9 +21,9 @@ import {
 
 const OFFICE_TYPES = ["Conventional", "Managed Office/Co-working"];
 const SAMPLE_PROMPTS = [
-  "5,000 sq ft managed office in Whitefield with 80+ desks & boardrooms",
+  "Bareshell office in BKC with panoramic views",
   "A-grade bare shell commercial space in BKC with panoramic views",
-  "Plug-and-play HQ in Cyber City Gurgaon under ₹15 Lakhs/month",
+  "100-seater office space within 1 km of a metro station",
 ];
 const CONTROL_H = "h-[clamp(2.75rem,5vh,3.5rem)]";
 const INPUT_BASE = `w-full ${CONTROL_H} rounded-xl bg-white/70 border border-[#A054A0]/20 text-black text-[13px] sm:text-sm font-medium outline-none transition-all duration-200 hover:border-[#A054A0] hover:bg-white focus:border-[#A054A0] focus:bg-white focus:ring-[3px] focus:ring-[#A054A0]/10 disabled:cursor-not-allowed disabled:opacity-50`;

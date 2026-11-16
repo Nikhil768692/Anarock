@@ -273,10 +273,10 @@ function PropertyCard({
       <Link
         href={propertyUrl}
         aria-label={`View details of ${propertyName}`}
-        className="flex flex-col px-4 pb-3 pt-2 sm:pb-4"
+        className="flex flex-col px-4 pb-3 pt-2 sm:pb-4 min-[1080px]:max-[1279px]:px-3"
       >
         <div className="mb-2.5 flex items-center justify-between gap-[1.2rem]">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#A054A0]">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#A054A0] min-[1080px]:max-[1279px]:tracking-[0.05em]">
             {isCoworking
               ? "Managed Office/Co-working Property"
               : "Conventional Property"}
@@ -364,11 +364,11 @@ function PropertyCard({
           }}
           className="group inline-flex mt-2 min-h-[36px] w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-800/25 bg-white px-3.5 py-1.5 text-xs font-semibold text-black shadow-xs transition-all duration-200 hover:border-[#A054A0]/50 hover:bg-[#A054A0]/5 hover:text-[#A054A0] active:scale-[0.98]"
         >
-          <span className="h-px w-4 bg-[#DCCBE2] transition-colors group-hover:bg-[#A054A0]/40" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em]">
+          <span className="h-px w-4 bg-[#DCCBE2] transition-colors group-hover:bg-[#A054A0]/40 min-[1080px]:max-[1279px]:hidden" />
+          <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.14em] min-[1080px]:max-[1279px]:tracking-[0.08em]">
             View Property Details
           </span>
-          <span className="h-px w-4 bg-[#DCCBE2] transition-colors group-hover:bg-[#A054A0]/40" />
+          <span className="h-px w-4 bg-[#DCCBE2] transition-colors group-hover:bg-[#A054A0]/40 min-[1080px]:max-[1279px]:hidden" />
         </div>
       </Link>
     </article>
