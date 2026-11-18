@@ -113,7 +113,7 @@ export default function GccCalculatorClient() {
   }, []);
 
   return (
-    <main className="min-h-screen w-full min-w-0 bg-[#F8F7F8]">
+    <main className="min-h-screen w-full min-w-0 bg-white">
       <Breadcrumbs
         items={[
           { label: "Services", href: "/services" },

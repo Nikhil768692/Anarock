@@ -1120,6 +1120,7 @@ function ReviewSubmission({
                     : "Please review the information before submitting your property."
             }
             icon={<FileCheck2 size={21} />}
+            descriptionClassName="text-[#3F3A40]"
         >
             <div className="space-y-5">
                 <ReviewCard title="Property" icon={<Building2 size={18} />}>
@@ -1161,7 +1162,7 @@ function ReviewSubmission({
                     <ReviewRow label="Company" value={form.companyName} />
                 </ReviewCard>
                 {isAssistance && (
-                    <SectionCard title="Declaration & privacy" description="Please confirm before submitting.">
+                    <SectionCard title="Declaration & privacy" description="Please confirm before submitting." descriptionClassName="text-[#3F3A40]">
                         <label className="flex cursor-pointer gap-3 rounded-2xl border border-[#A054A0]/10 bg-[#A054A0]/[0.025] p-5">
                             <input
                                 type="checkbox"
@@ -1170,8 +1171,8 @@ function ReviewSubmission({
                                 className="mt-0.5 h-4 w-4 accent-[#A054A0]"
                             />
                             <div>
-                                <p className="text-sm font-semibold">I confirm that the information provided is accurate.</p>
-                                <p className="mt-1 text-xs leading-5 text-black/50">
+                                <p className="text-sm font-semibold text-black">I confirm that the information provided is accurate.</p>
+                                <p className="mt-1 text-xs leading-5 text-[#3F3A40]">
                                     I agree to be contacted regarding my property listing and to the platform&apos;s privacy policy, and understand that my information may be used for verification purposes.
                                 </p>
                             </div>
@@ -1186,7 +1187,7 @@ function ReviewSubmission({
                 )}
                 <div className="flex items-start gap-3 rounded-2xl border border-[#A054A0]/15 bg-[#A054A0]/[0.045] p-5">
                     <Info size={18} className="mt-0.5 shrink-0 text-[#A054A0]" />
-                    <p className="text-xs leading-5 text-[#70456F]">
+                    <p className="text-xs leading-5 text-[#3F3A40]">
                         After submission, our administration team will verify the information. The property will only be published after successful verification.
                     </p>
                 </div>
@@ -1269,10 +1270,10 @@ function SuccessScreen({ method, onRestart }) {
     );
 }
 
-function PageShell({ eyebrow, title, description, icon, children }) {
+function PageShell({ eyebrow, title, description, icon, children, descriptionClassName = "text-slate-500" }) {
     return (
         <div>
-            <div className="mb-9 max-w-3xl">
+            <div className="mb-9">
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#A054A0]/15 bg-gradient-to-br from-[#A054A0]/15 to-[#E8CBE8]/30 text-[#A054A0] shadow-[0_10px_30px_rgba(160,84,160,0.10)]">
                     {icon}
                 </div>
@@ -1280,7 +1281,7 @@ function PageShell({ eyebrow, title, description, icon, children }) {
                 <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] text-slate-950 sm:text-[42px] sm:leading-[1.06]">
                     {title}
                 </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-[15px]">{description}</p>
+                <p className={`mt-4 text-sm leading-7 sm:text-[15px] ${descriptionClassName}`}>{description}</p>
             </div>
             {children}
         </div>
@@ -1362,6 +1363,7 @@ function Field({
                     onChange={(event) => onChange(event.target.value)}
                     className={[
                         "h-12 w-full rounded-xl border bg-white/85 px-4 text-sm outline-none shadow-[0_6px_25px_rgba(15,23,42,0.03)] backdrop-blur transition-all",
+                        icon ? "pl-11" : "",
                         suffix ? "pr-20" : "",
                         error
                             ? "border-red-300 focus:border-red-400"
@@ -1583,7 +1585,7 @@ function MethodCard({ icon, title, description, features, onClick }) {
     );
 }
 
-function SectionCard({ number, title, description, children }) {
+function SectionCard({ number, title, description, children, descriptionClassName = "text-black/40" }) {
     return (
         <div className="rounded-[28px] border border-white bg-white/80 p-6 shadow-[0_15px_50px_rgba(30,20,40,0.045)] backdrop-blur-xl sm:p-8">
             <div className="mb-7 flex gap-4">
@@ -1594,7 +1596,7 @@ function SectionCard({ number, title, description, children }) {
                 )}
                 <div>
                     <h2 className="text-base font-semibold">{title}</h2>
-                    <p className="mt-1 text-xs text-black/40">{description}</p>
+                    <p className={`mt-1 text-xs ${descriptionClassName}`}>{description}</p>
                 </div>
             </div>
             {children}
@@ -1607,7 +1609,7 @@ function ReviewCard({ title, icon, children }) {
         <div className="rounded-[28px] border border-white bg-white/80 p-6 shadow-[0_15px_50px_rgba(30,20,40,0.045)] backdrop-blur-xl sm:p-7">
             <div className="mb-5 flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E8CBE8] text-[#A054A0]">{icon}</div>
-                <h2 className="text-sm font-semibold">{title}</h2>
+                <h2 className="text-sm font-semibold text-black">{title}</h2>
             </div>
             <div className="divide-y divide-black/[0.06]">{children}</div>
         </div>
@@ -1617,8 +1619,8 @@ function ReviewCard({ title, icon, children }) {
 function ReviewRow({ label, value }) {
     return (
         <div className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <span className="text-xs text-black/40">{label}</span>
-            <span className="text-sm font-medium sm:text-right">{value || "—"}</span>
+            <span className="text-xs font-medium text-[#3F3A40]">{label}</span>
+            <span className="text-sm font-semibold text-black sm:text-right">{value || "—"}</span>
         </div>
     );
 }

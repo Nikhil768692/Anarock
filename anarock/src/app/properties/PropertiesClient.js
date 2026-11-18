@@ -3034,7 +3034,7 @@ function PropertiesClientContent() {
                   </p>
                   <p className="mt-1 text-xs leading-5 text-slate-600">
                     We haven&apos;t listed all available properties here.
-                    Connect with our property advisors to discover exclusive
+                    Connect with our team to discover exclusive
                     office spaces tailored to your requirements.
                   </p>
                 </div>
@@ -3472,7 +3472,7 @@ function PropertiesClientContent() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="exclusive-lead-title"
-            className="my-auto w-full max-w-md overflow-visible rounded-xl bg-white shadow-2xl"
+            className="my-auto w-full max-w-md overflow-visible rounded-xl bg-white shadow-2xl sm:max-w-[38rem]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
               <div>
@@ -3488,8 +3488,8 @@ function PropertiesClientContent() {
                   Find your ideal office space
                 </h2>
 
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Share your contact details and our property advisors will help
+                <p className="mt-1 text-xs leading-5 text-slate-500 sm:whitespace-nowrap">
+                  Share your contact details and our team will help
                   you explore more options.
                 </p>
               </div>
@@ -3515,7 +3515,7 @@ function PropertiesClientContent() {
                   </h3>
 
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                    Your request has been received. Our property advisors will
+                    Your request has been received. Our team will
                     connect with you about suitable office spaces.
                   </p>
 
@@ -3740,7 +3740,7 @@ function PropertiesClientContent() {
                       </>
                     ) : (
                       <>
-                        Connect with an Advisor
+                        Connect with our team
                         <ArrowRight className="h-4 w-4" />
                       </>
                     )}
