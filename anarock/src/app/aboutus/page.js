@@ -274,7 +274,7 @@ function LegacyJourney() {
                             Three decades in the making
                         </h2>
                     </div>
-                    <p className="max-w-md text-sm leading-6 text-white/70 sm:text-base lg:text-right">
+                    <p className="max-w-md text-sm leading-6 text-white sm:text-base lg:text-right">
                         The leadership behind Anarock built some of India&apos;s best-known real estate firms before starting its own in 2017.
                     </p>
                 </div>
@@ -317,7 +317,7 @@ function LegacyJourney() {
                                         className="mt-3 h-7 w-auto lg:h-8"
                                     />
                                 ) : (
-                                    <p className="mt-3 text-sm leading-6 text-white/75 lg:text-[15px]">
+                                    <p className="mt-3 text-sm leading-6 text-white lg:text-[15px]">
                                         {item.name}
                                     </p>
                                 )}
@@ -352,7 +352,7 @@ function LegacyJourney() {
                                         className="mt-2.5 h-7 w-auto"
                                     />
                                 ) : (
-                                    <p className="mt-2 text-[15px] text-white/75">{item.name}</p>
+                                    <p className="mt-2 text-[15px] text-white">{item.name}</p>
                                 )}
                             </li>
                         );
@@ -405,7 +405,7 @@ function JourneyYear({ item, index, now = false }) {
                         </span>
                     )}
                 </div>
-                <p className="mt-3 text-[13px] leading-[1.6] text-[#4B464C] [&_strong]:font-semibold [&_strong]:text-black xl:text-sm">
+                <p className="mt-3 text-[13px] leading-[1.6] text-black [&_strong]:font-semibold [&_strong]:text-black xl:text-sm">
                     {item.detail}
                 </p>
                 <JourneyLogos year={item.year} className="mt-auto pt-4" />
@@ -622,7 +622,7 @@ export default function AboutUsPage() {
                                 <span className="text-[#A054A0]">Future</span>
                             </h2>
                         </div>
-                        <p className="max-w-md text-sm italic leading-6 text-[#5C565D] sm:text-base lg:text-right">
+                        <p className="max-w-md text-sm italic leading-6 text-black sm:text-base lg:text-right">
                             A journey of expansion, innovation and new opportunities
                             shaping{" "}
                             <span className="text-[#A054A0]">Anarock&apos;s evolution</span>.
@@ -675,7 +675,7 @@ export default function AboutUsPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <p className="mt-2.5 text-sm leading-6 text-[#4B464C] [&_strong]:font-semibold [&_strong]:text-black">
+                                    <p className="mt-2.5 text-sm leading-6 text-black [&_strong]:font-semibold [&_strong]:text-black">
                                         {item.detail}
                                     </p>
                                     <JourneyLogos year={item.year} className="mt-3" />

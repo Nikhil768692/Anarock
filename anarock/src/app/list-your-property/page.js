@@ -41,11 +41,11 @@ const initialForm = {
     phone: "",
     email: "",
     area: "",
+    floorPlate: "",
+    rent: "",
+    achievableRent: "",
     seats: "",
-    rentMin: "",
-    rentMax: "",
-    seatPriceMin: "",
-    seatPriceMax: "",
+    seatPrice: "",
     description: "",
 };
 
@@ -53,12 +53,12 @@ const propertyTypes = [
     {
         value: "conventional",
         label: "Conventional Office",
-        description: "Office spaces, commercial buildings & managed offices",
+        description: "Office spaces & commercial buildings",
     },
     {
         value: "coworking",
         label: "Coworking",
-        description: "Coworking spaces, flexible offices & managed workspaces",
+        description: "Coworking spaces, flexible & managed offices",
     },
 ];
 
@@ -800,7 +800,7 @@ function ContactDetails({ form, errors, updateField, phoneCountry, setPhoneCount
             description="We'll use these details only for property verification and listing communication."
             icon={<UserRound size={21} />}
         >
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                 <Field
                     label="Contact name"
                     required
@@ -833,12 +833,14 @@ function ContactDetails({ form, errors, updateField, phoneCountry, setPhoneCount
                     error={errors.email}
                     onChange={(value) => updateField("email", value)}
                 />
+                {/* Company name hidden for now.
                 <Field
                     label="Company name"
                     value={form.companyName}
                     placeholder="Optional"
                     onChange={(value) => updateField("companyName", value)}
                 />
+                */}
             </div>
             <div className="mt-8 rounded-[24px] border border-[#A054A0]/10 bg-[#A054A0]/[0.035] p-5">
                 <div className="flex gap-3">
@@ -846,7 +848,7 @@ function ContactDetails({ form, errors, updateField, phoneCountry, setPhoneCount
                     <div>
                         <p className="text-sm font-semibold">Your information is secure</p>
                         <p className="mt-1 text-xs leading-5 text-black/50">
-                            Your contact details will not be displayed publicly. They are used for verification and communication regarding your listing.
+                            Your contact details will be used for verification and communication regarding your listing.
                         </p>
                     </div>
                 </div>
@@ -1002,25 +1004,18 @@ function ListingForm({
                                     onChange={(value) => updateField("seats", value)}
                                 />
                                 <Field
-                                    label="Minimum seat price / month"
+                                    label="Per seat cost"
                                     type="number"
-                                    value={form.seatPriceMin}
-                                    error={errors.seatPriceMin}
+                                    value={form.seatPrice}
                                     placeholder={`${currencySymbol}0`}
-                                    onChange={(value) => updateField("seatPriceMin", value)}
-                                />
-                                <Field
-                                    label="Maximum seat price / month"
-                                    type="number"
-                                    value={form.seatPriceMax}
-                                    placeholder={`${currencySymbol}0`}
-                                    onChange={(value) => updateField("seatPriceMax", value)}
+                                    suffix="/ month"
+                                    onChange={(value) => updateField("seatPrice", value)}
                                 />
                             </>
                         ) : (
                             <>
                                 <Field
-                                    label="Area"
+                                    label="Leasable area"
                                     type="number"
                                     value={form.area}
                                     error={errors.area}
@@ -1029,19 +1024,28 @@ function ListingForm({
                                     onChange={(value) => updateField("area", value)}
                                 />
                                 <Field
-                                    label="Minimum rent / month"
+                                    label="Floor plate"
                                     type="number"
-                                    value={form.rentMin}
-                                    error={errors.rentMin}
-                                    placeholder={`${currencySymbol}0`}
-                                    onChange={(value) => updateField("rentMin", value)}
+                                    value={form.floorPlate}
+                                    placeholder="e.g. 20000"
+                                    suffix="sq ft"
+                                    onChange={(value) => updateField("floorPlate", value)}
                                 />
                                 <Field
-                                    label="Maximum rent / month"
+                                    label="Rent"
                                     type="number"
-                                    value={form.rentMax}
+                                    value={form.rent}
                                     placeholder={`${currencySymbol}0`}
-                                    onChange={(value) => updateField("rentMax", value)}
+                                    suffix="/ sq ft / month"
+                                    onChange={(value) => updateField("rent", value)}
+                                />
+                                <Field
+                                    label="Achievable rent"
+                                    type="number"
+                                    value={form.achievableRent}
+                                    placeholder={`${currencySymbol}0`}
+                                    suffix="/ sq ft / month"
+                                    onChange={(value) => updateField("achievableRent", value)}
                                 />
                             </>
                         )}
@@ -1108,8 +1112,6 @@ function ReviewSubmission({
 }) {
     const isAssistance = method === "callback";
     const price = (value) => (value ? `${currencySymbol}${value}` : "—");
-    const range = (min, max) =>
-        min || max ? `${price(min)} – ${price(max)}` : "—";
     return (
         <PageShell
             eyebrow={isAssistance ? "04 / Review" : "05 / Review"}
@@ -1132,26 +1134,19 @@ function ReviewSubmission({
                     <ReviewRow label={isCoworking ? "Operator" : "Developer"} value={form.developer} />
                     {!isAssistance && (
                         <>
-                            <ReviewRow
-                                label={isCoworking ? "Seats" : "Area"}
-                                value={
-                                    isCoworking
-                                        ? form.seats
-                                            ? `${form.seats} seats`
-                                            : "—"
-                                        : form.area
-                                            ? `${form.area} sq ft`
-                                            : "—"
-                                }
-                            />
-                            <ReviewRow
-                                label={isCoworking ? "Seat price / month" : "Rent / month"}
-                                value={
-                                    isCoworking
-                                        ? range(form.seatPriceMin, form.seatPriceMax)
-                                        : range(form.rentMin, form.rentMax)
-                                }
-                            />
+                            {isCoworking ? (
+                                <>
+                                    <ReviewRow label="Seats offered" value={form.seats ? `${form.seats} seats` : "—"} />
+                                    <ReviewRow label="Per seat cost" value={form.seatPrice ? `${price(form.seatPrice)} / month` : "—"} />
+                                </>
+                            ) : (
+                                <>
+                                    <ReviewRow label="Leasable area" value={form.area ? `${form.area} sq ft` : "—"} />
+                                    <ReviewRow label="Floor plate" value={form.floorPlate ? `${form.floorPlate} sq ft` : "—"} />
+                                    <ReviewRow label="Rent" value={form.rent ? `${price(form.rent)} / sq ft / month` : "—"} />
+                                    <ReviewRow label="Achievable rent" value={form.achievableRent ? `${price(form.achievableRent)} / sq ft / month` : "—"} />
+                                </>
+                            )}
                         </>
                     )}
                 </ReviewCard>
@@ -1159,7 +1154,9 @@ function ReviewSubmission({
                     <ReviewRow label="Contact" value={form.contactName} />
                     <ReviewRow label="Phone" value={form.phone ? `${phoneDial} ${form.phone}` : ""} />
                     <ReviewRow label="Email" value={form.email} />
+                    {/* Company name hidden for now.
                     <ReviewRow label="Company" value={form.companyName} />
+                    */}
                 </ReviewCard>
                 {isAssistance && (
                     <SectionCard title="Declaration & privacy" description="Please confirm before submitting." descriptionClassName="text-[#3F3A40]">
@@ -1348,7 +1345,7 @@ function Field({
             </label>
             <div className="relative">
                 {icon && (
-                    <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-black/35">
+                    <div className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-black/40">
                         {icon}
                     </div>
                 )}
@@ -1363,8 +1360,8 @@ function Field({
                     onChange={(event) => onChange(event.target.value)}
                     className={[
                         "h-12 w-full rounded-xl border bg-white/85 px-4 text-sm outline-none shadow-[0_6px_25px_rgba(15,23,42,0.03)] backdrop-blur transition-all",
-                        icon ? "pl-11" : "",
-                        suffix ? "pr-20" : "",
+                        icon ? "pl-10" : "",
+                        suffix ? (suffix.length > 6 ? "pr-32" : "pr-20") : "",
                         error
                             ? "border-red-300 focus:border-red-400"
                             : "border-black/[0.09] focus:border-[#A054A0]/50 focus:ring-4 focus:ring-[#A054A0]/10",
@@ -1540,9 +1537,9 @@ function SelectField({ label, required, value, options, placeholder, error, load
                         disabled ? "cursor-not-allowed bg-black/[0.025] opacity-60" : "",
                     ].join(" ")}
                 >
-                    <option value="">{placeholder}</option>
+                    <option value="" className="text-black/50">{placeholder}</option>
                     {options.map((option) => (
-                        <option key={option} value={option}>
+                        <option key={option} value={option} className="text-black">
                             {option}
                         </option>
                     ))}
