@@ -257,11 +257,8 @@ function LegacyJourney() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.2 }}
                 transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="relative mx-auto w-full max-w-[1440px] min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br from-[#241726] via-[#33203A] to-[#4A2A4C] px-6 py-10 text-white sm:px-10 sm:py-12 lg:px-14 lg:py-14"
+                className="relative mx-auto w-full max-w-[1440px] min-w-0 overflow-hidden rounded-2xl bg-[#33203A] px-6 py-10 text-white sm:px-10 sm:py-12 lg:px-14 lg:py-14"
             >
-                {/* soft glow behind the Anarock end of the line */}
-                <span className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#A054A0]/30 blur-3xl" />
-
                 <div className="relative grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-10">
                     <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#E4B8E4]">

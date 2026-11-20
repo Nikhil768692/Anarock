@@ -752,7 +752,19 @@ async function addSheetRow(record) {
     }
 }
 
-function buildSheetRecord({ method, form, currency, location }) {
+// The sheet keeps areas in sq ft. If the visitor typed in sq m (navbar unit),
+// areas are converted to sq ft and rents from per sq m to per sq ft.
+const SQFT_PER_SQM = 10.7639;
+
+function toSqft(value, unit, kind) {
+    const text = cleanNumber(value);
+    if (!text || unit !== "sqm") return text;
+    const number = Number(text);
+    const converted = kind === "area" ? number * SQFT_PER_SQM : number / SQFT_PER_SQM;
+    return String(Math.round(converted * 100) / 100);
+}
+
+function buildSheetRecord({ method, form, currency, unit, location }) {
     const isCoworking = form.propertyType === "coworking";
     const safeLocation = location && typeof location === "object" ? location : {};
 
@@ -771,10 +783,10 @@ function buildSheetRecord({ method, form, currency, location }) {
         "Micromarket": cleanText(form.micromarket, 150),
         "Address": cleanText(form.address, 500),
         "Developer/Operator": cleanText(form.developer, 150),
-        "Leasable Area (sq ft)": isCoworking ? "" : cleanNumber(form.area),
-        "Floor Plate (sq ft)": isCoworking ? "" : cleanNumber(form.floorPlate),
-        "Rent": isCoworking ? "" : cleanNumber(form.rent),
-        "Achievable Rent": isCoworking ? "" : cleanNumber(form.achievableRent),
+        "Leasable Area (sq ft)": isCoworking ? "" : toSqft(form.area, unit, "area"),
+        "Floor Plate (sq ft)": isCoworking ? "" : toSqft(form.floorPlate, unit, "area"),
+        "Rent": isCoworking ? "" : toSqft(form.rent, unit, "rent"),
+        "Achievable Rent": isCoworking ? "" : toSqft(form.achievableRent, unit, "rent"),
         "Seats Offered": isCoworking ? cleanNumber(form.seats) : "",
         "Per Seat Cost": isCoworking ? cleanNumber(form.seatPrice) : "",
         "Currency": CURRENCIES.has(currency) ? currency : "INR",
@@ -804,7 +816,7 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: body.message }, { status: body.status });
     }
 
-    const { method, currency, location } = body.data;
+    const { method, currency, unit, location } = body.data;
     const form = body.data.form && typeof body.data.form === "object" ? body.data.form : {};
 
     if (!METHODS[method]) {
@@ -843,7 +855,7 @@ export async function POST(request) {
     }
 
     try {
-        await addSheetRow(buildSheetRecord({ method, form, currency, location }));
+        await addSheetRow(buildSheetRecord({ method, form, currency, unit, location }));
         return NextResponse.json({ success: true, message: "Submission received." });
     } catch (error) {
         console.error("Property form error:", error?.message || error);

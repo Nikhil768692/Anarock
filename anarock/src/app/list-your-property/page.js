@@ -246,8 +246,10 @@ export default function ListYourPropertyPage() {
     const [optionsError, setOptionsError] = useState("");
     const [phoneCountry, setPhoneCountry] = useState(PHONE_COUNTRIES[0]);
     const [formConsent, setFormConsent] = useState(false);
-    const { currency } = usePreferences();
+    const { currency, unit } = usePreferences();
     const currencySymbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
+    // Area unit follows the navbar (sq ft / sq m).
+    const areaUnit = unit === "sqm" ? "sq m" : "sq ft";
     const [showReview, setShowReview] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -449,6 +451,7 @@ export default function ListYourPropertyPage() {
                         phone: `${phoneCountry.dial}${String(form.phone || "").replace(/\D/g, "")}`,
                     },
                     currency,
+                    unit,
                     location: getUserLocation(),
                 }),
             });
@@ -549,6 +552,7 @@ export default function ListYourPropertyPage() {
                                     updateField={updateField}
                                     isCoworking={isCoworking}
                                     currencySymbol={currencySymbol}
+                                    areaUnit={areaUnit}
                                     formConsent={formConsent}
                                     setFormConsent={(value) => {
                                         setFormConsent(value);
@@ -569,6 +573,7 @@ export default function ListYourPropertyPage() {
                                     method={method}
                                     isCoworking={isCoworking}
                                     currencySymbol={currencySymbol}
+                                    areaUnit={areaUnit}
                                     phoneDial={phoneCountry.dial}
                                     formConsent={formConsent}
                                     setFormConsent={(value) => {
@@ -918,6 +923,7 @@ function ListingForm({
     updateField,
     isCoworking,
     currencySymbol,
+    areaUnit,
     formConsent,
     setFormConsent,
     micromarkets,
@@ -1020,7 +1026,7 @@ function ListingForm({
                                     value={form.area}
                                     error={errors.area}
                                     placeholder="e.g. 25000"
-                                    suffix="sq ft"
+                                    suffix={areaUnit}
                                     onChange={(value) => updateField("area", value)}
                                 />
                                 <Field
@@ -1028,7 +1034,7 @@ function ListingForm({
                                     type="number"
                                     value={form.floorPlate}
                                     placeholder="e.g. 20000"
-                                    suffix="sq ft"
+                                    suffix={areaUnit}
                                     onChange={(value) => updateField("floorPlate", value)}
                                 />
                                 <Field
@@ -1036,7 +1042,7 @@ function ListingForm({
                                     type="number"
                                     value={form.rent}
                                     placeholder={`${currencySymbol}0`}
-                                    suffix="/ sq ft / month"
+                                    suffix={`/ ${areaUnit} / month`}
                                     onChange={(value) => updateField("rent", value)}
                                 />
                                 <Field
@@ -1044,7 +1050,7 @@ function ListingForm({
                                     type="number"
                                     value={form.achievableRent}
                                     placeholder={`${currencySymbol}0`}
-                                    suffix="/ sq ft / month"
+                                    suffix={`/ ${areaUnit} / month`}
                                     onChange={(value) => updateField("achievableRent", value)}
                                 />
                             </>
@@ -1101,6 +1107,7 @@ function ReviewSubmission({
     method,
     isCoworking,
     currencySymbol,
+    areaUnit,
     phoneDial,
     formConsent,
     setFormConsent,
@@ -1141,10 +1148,10 @@ function ReviewSubmission({
                                 </>
                             ) : (
                                 <>
-                                    <ReviewRow label="Leasable area" value={form.area ? `${form.area} sq ft` : "—"} />
-                                    <ReviewRow label="Floor plate" value={form.floorPlate ? `${form.floorPlate} sq ft` : "—"} />
-                                    <ReviewRow label="Rent" value={form.rent ? `${price(form.rent)} / sq ft / month` : "—"} />
-                                    <ReviewRow label="Achievable rent" value={form.achievableRent ? `${price(form.achievableRent)} / sq ft / month` : "—"} />
+                                    <ReviewRow label="Leasable area" value={form.area ? `${form.area} ${areaUnit}` : "—"} />
+                                    <ReviewRow label="Floor plate" value={form.floorPlate ? `${form.floorPlate} ${areaUnit}` : "—"} />
+                                    <ReviewRow label="Rent" value={form.rent ? `${price(form.rent)} / ${areaUnit} / month` : "—"} />
+                                    <ReviewRow label="Achievable rent" value={form.achievableRent ? `${price(form.achievableRent)} / ${areaUnit} / month` : "—"} />
                                 </>
                             )}
                         </>
@@ -1368,7 +1375,7 @@ function Field({
                     ].join(" ")}
                 />
                 {suffix && (
-                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black">
                         {suffix}
                     </span>
                 )}

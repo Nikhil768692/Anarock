@@ -356,7 +356,12 @@ function render(){
 
 /* ---- J-curve ---- */
 function drawCurve(R){
-  const W=800,H=300,PL=68,PR=16,PT=16,PB=30;
+  // Draw at the real width of the box so labels stay readable on phones.
+  const box=$("curve").parentElement;
+  const cw=box&&box.clientWidth?box.clientWidth:800;
+  const W=Math.round(Math.min(800,Math.max(300,cw))), small=W<560;
+  const H=small?260:300, PL=small?58:68, PR=small?10:16, PT=16, PB=30;
+  $("curve").setAttribute("viewBox",`0 0 ${W} ${H}`);
   const iw=W-PL-PR, ih=H-PT-PB;
   const vals=R.rows.map(r=>r.cum);
   let lo=Math.min(0,...vals), hi=Math.max(0,...vals);
@@ -657,16 +662,16 @@ function drawUnit(R){
   const max=Math.max(a,b)||1;
   const bar=(v,c)=>`<div style="height:26px;width:${(v/max*100).toFixed(1)}%;background:${c};border-radius:2px;min-width:2px"></div>`;
   $("unit").innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:26px">
+    <div class="ue-grid">
       <div>
         <div class="eyebrow">${LOCS[S.loc].n}</div>
-        <div style="font-size:27px;font-weight:600;margin:6px 0 9px;letter-spacing:-.02em" class="num">${fFull(a)}</div>
+        <div class="num ue-v">${fFull(a)}</div>
         ${bar(a,"var(--cost)")}
         <p class="hint" style="margin-top:7px">Per home head, employment plus occupancy, year ${Math.round(S.hz/12)}</p>
       </div>
       <div>
         <div class="eyebrow">${CITIES[S.city].n} — ${OPS[S.op].n}</div>
-        <div style="font-size:27px;font-weight:600;margin:6px 0 9px;letter-spacing:-.02em;color:var(--gain)" class="num">${fFull(b)}</div>
+        <div class="num ue-v" style="color:var(--gain)">${fFull(b)}</div>
         ${bar(b,"var(--gain)")}
         <p class="hint" style="margin-top:7px">Per India head, incl. attrition, governance and occupancy, ${S.sub.toFixed(2)} heads per home head</p>
       </div>
@@ -748,6 +753,14 @@ $("reBody").addEventListener("change",e=>{
 
 
 render();
+
+/* Redraw the chart when the screen width changes (rotate, resize). */
+let lastCurveW=0, curveTimer=null;
+window.addEventListener("resize",()=>{
+  const svg=document.getElementById("curve"); if(!svg||!svg.parentElement) return;
+  const w=svg.parentElement.clientWidth; if(Math.abs(w-lastCurveW)<2) return;
+  lastCurveW=w; clearTimeout(curveTimer); curveTimer=setTimeout(render,150);
+});
 
 
 /* The page passes the navbar currency and unit here, now and on every change. */
