@@ -766,7 +766,10 @@ function MarketSection({
   const stats = [
     {
       label: "Average rental",
-      value: formatRent(market?.averageRent, currency, unit, exchangeRates),
+      value:
+        Number.isFinite(market?.rentMin) || Number.isFinite(market?.rentMax)
+          ? formatRentBand(market?.rentMin, market?.rentMax, currency, unit, exchangeRates).replace(/\s*\/.*$/, "")
+          : formatRent(market?.averageRent, currency, unit, exchangeRates),
       note: `per ${unitLabel} / month`,
     },
     {
@@ -784,7 +787,7 @@ function MarketSection({
       note: `${unitLabel} leased`,
     },
     {
-      label: "New supply, next 12 mo",
+      label: "New supply",
       value: formatMillionArea(market?.newSupplyMnSqft, unit),
       note: `${unitLabel} completing`,
     },

@@ -165,12 +165,24 @@ function mapAdvisor(row) {
   };
 }
 
+// Rent is INR per sq ft per month. RentRange is a text column that holds a
+// range like "60-400" (shown as "₹60–400"); AverageRent holds one number.
+function parseRent(value) {
+  const text = toText(value).replace(/,/g, "");
+  const range = text.match(/^(\d+(?:\.\d+)?)\s*[-–—]\s*(\d+(?:\.\d+)?)$/);
+  if (range) {
+    return { averageRent: null, rentMin: Number(range[1]), rentMax: Number(range[2]) };
+  }
+  return { averageRent: toNumber(text), rentMin: null, rentMax: null };
+}
+
 function mapMarketStats(row) {
   if (!row) return null;
 
   return {
     quarterLabel: toText(getField(row, "QuarterLabel")),
-    averageRent: toNumber(getField(row, "AverageRent")),
+    // RentRange (text, e.g. "60-400") wins over AverageRent (number).
+    ...parseRent(getField(row, "RentRange") || getField(row, "AverageRent")),
     vacancyPercent: toNumber(getField(row, "VacancyPercent")),
     vacancyChangePts: toNumber(getField(row, "VacancyChangePts")),
     absorptionMnSqft: toNumber(getField(row, "AbsorptionMnSqft")),

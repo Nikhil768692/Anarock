@@ -1013,7 +1013,8 @@ function ListingForm({
                                     label="Per seat cost"
                                     type="number"
                                     value={form.seatPrice}
-                                    placeholder={`${currencySymbol}0`}
+                                    prefix={currencySymbol}
+                                    placeholder="0"
                                     suffix="/ month"
                                     onChange={(value) => updateField("seatPrice", value)}
                                 />
@@ -1041,7 +1042,8 @@ function ListingForm({
                                     label="Rent"
                                     type="number"
                                     value={form.rent}
-                                    placeholder={`${currencySymbol}0`}
+                                    prefix={currencySymbol}
+                                    placeholder="0"
                                     suffix={`/ ${areaUnit} / month`}
                                     onChange={(value) => updateField("rent", value)}
                                 />
@@ -1049,7 +1051,8 @@ function ListingForm({
                                     label="Achievable rent"
                                     type="number"
                                     value={form.achievableRent}
-                                    placeholder={`${currencySymbol}0`}
+                                    prefix={currencySymbol}
+                                    placeholder="0"
                                     suffix={`/ ${areaUnit} / month`}
                                     onChange={(value) => updateField("achievableRent", value)}
                                 />
@@ -1343,8 +1346,11 @@ function Field({
     maxLength,
     autoComplete,
     icon,
+    prefix,
     suffix,
 }) {
+    const isNumber = type === "number";
+    const prefixText = prefix ? String(prefix).trim() : "";
     return (
         <div>
             <label className="mb-2 block text-sm font-semibold">
@@ -1356,18 +1362,32 @@ function Field({
                         {icon}
                     </div>
                 )}
+                {prefixText && (
+                    <span className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-sm text-black">
+                        {prefixText}
+                    </span>
+                )}
                 <input
                     type={type}
-                    inputMode={inputMode}
+                    inputMode={isNumber ? "decimal" : inputMode}
+                    min={isNumber ? 0 : undefined}
                     maxLength={maxLength}
                     autoComplete={autoComplete}
                     value={value}
                     placeholder={placeholder}
                     aria-invalid={Boolean(error)}
-                    onChange={(event) => onChange(event.target.value)}
+                    onKeyDown={(event) => {
+                        // Numbers here are never negative: block minus, plus and exponent keys.
+                        if (isNumber && ["-", "+", "e", "E"].includes(event.key)) event.preventDefault();
+                    }}
+                    onChange={(event) => {
+                        const next = event.target.value;
+                        onChange(isNumber ? next.replace(/-/g, "") : next);
+                    }}
                     className={[
                         "h-12 w-full rounded-xl border bg-white/85 px-4 text-sm outline-none shadow-[0_6px_25px_rgba(15,23,42,0.03)] backdrop-blur transition-all",
                         icon ? "pl-10" : "",
+                        prefixText ? (prefixText.length > 1 ? "pl-14" : "pl-9") : "",
                         suffix ? (suffix.length > 6 ? "pr-32" : "pr-20") : "",
                         error
                             ? "border-red-300 focus:border-red-400"
