@@ -203,9 +203,16 @@ const highlightYears = new Set(["2017", "2026"]);
 
 // Logos shown under a year. Add an entry here when a new logo file is in /public.
 const journeyLogos = {
-    "2017": [{ src: "/Anarock.svg", alt: "Anarock", width: 148, height: 40 }],
-    "2018": [{ src: "/services/research/hvs.png", alt: "HVS", width: 234, height: 126 }],
-    "2022": [{ src: "/services/research/myhq.svg", alt: "myHQ", width: 641, height: 240 }],
+    "2017": [{ src: "/aboutus/journey/anarock.png", alt: "Anarock", width: 366, height: 60 }],
+    "2018": [{ src: "/aboutus/journey/hvs.png", alt: "HVS", width: 157, height: 78 }],
+    "2019": [{ src: "/aboutus/journey/gptw.png", alt: "Great Place To Work Certified", width: 94, height: 160, tall: true }],
+    "2020": [{ src: "/aboutus/journey/anarock-strata.png", alt: "Anarock Commercial & Retail Strata", width: 218, height: 54 }],
+    "2021": [{ src: "/aboutus/journey/anacity.png", alt: "ANACITY", width: 580, height: 111 }],
+    "2022": [{ src: "/aboutus/journey/myhq.png", alt: "myHQ", width: 143, height: 69 }],
+    "2023": [{ src: "/aboutus/journey/anarock-middle-east.png", alt: "Anarock Middle East", width: 394, height: 100 }],
+    "2024": [{ src: "/aboutus/journey/360one.png", alt: "360 ONE", width: 120, height: 124, tall: true }],
+    "2025": [{ src: "/aboutus/journey/anarock-pmes.png", alt: "Anarock Project Management and Engineering Services", width: 180, height: 58 }],
+    "2026": [{ src: "/aboutus/journey/dsp.png", alt: "DSP Design Associates", width: 161, height: 160, tall: true }],
 };
 
 function JourneyLogos({ year, className = "" }) {
@@ -222,7 +229,7 @@ function JourneyLogos({ year, className = "" }) {
                     width={logo.width}
                     height={logo.height}
                     unoptimized
-                    className="h-7 w-auto max-w-[110px] object-contain"
+                    className={`w-auto object-contain ${logo.tall ? "h-10" : "h-7 max-w-[130px]"}`}
                 />
             ))}
         </div>
