@@ -352,6 +352,57 @@ function createDataStoreTable(tableId) {
   };
 }
 
+// Runs a ZCQL query (SELECT only) and returns plain row objects. ZCQL wraps
+// each row in its table name ({ Stats: { ... } }); that wrapper is removed.
+// The Catalyst refresh token needs the ZohoCatalyst.zcql.CREATE scope.
+export async function runZcqlQuery(query) {
+  const text = String(query ?? "").trim();
+
+  if (!/^select\s/i.test(text)) {
+    throw new Error("Only SELECT queries are allowed.");
+  }
+
+  const url =
+    `${getCatalystApiUrl()}/baas/v1/project/` +
+    `${encodeURIComponent(projectId)}/query`;
+
+  const response = await catalystFetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: text }),
+  });
+
+  const responseText = await response.text();
+  let data = {};
+
+  try {
+    data = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok || !Array.isArray(data?.data)) {
+    const error = new Error(
+      data?.data?.message ||
+      data?.message ||
+      `Catalyst ZCQL request failed (${response.status})`,
+    );
+    error.status = response.status;
+    error.code = "CATALYST_ZCQL_FAILED";
+    throw error;
+  }
+
+  return data.data.map((item) => {
+    if (item && typeof item === "object") {
+      const keys = Object.keys(item);
+      if (keys.length === 1 && item[keys[0]] && typeof item[keys[0]] === "object") {
+        return item[keys[0]];
+      }
+    }
+    return item;
+  });
+}
+
 export async function getPropertiesTable() {
   return createDataStoreTable(PROPERTIES_TABLE_ID);
 }

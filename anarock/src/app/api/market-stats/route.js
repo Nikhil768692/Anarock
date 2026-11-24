@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { getStatsTable } from "@/lib/catalyst";
+import { getStatsTable, runZcqlQuery, STATS_TABLE_ID } from "@/lib/catalyst";
 import { getOrFetchCache } from "@/lib/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CACHE_TTL = Number("300") * 1000;
+// Market stats change rarely: cache for 1 hour (the response already tells
+// the CDN to keep it for 1 hour too).
+const CACHE_TTL = 60 * 60 * 1000;
 
 function toNumber(value) {
   if (value === null || value === undefined || value === "") {
@@ -33,7 +35,36 @@ function getModifiedTime(row) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+// After a ZCQL failure, skip ZCQL for a while instead of retrying every time.
+const ZCQL_RETRY_AFTER_MS = 6 * 60 * 60 * 1000;
+let zcqlBlockedUntil = 0;
+
+// Reads only the latest row. If ZCQL is not available (for example the token
+// lacks the ZohoCatalyst.zcql.CREATE scope), the whole table is read instead,
+// as before.
+async function fetchLatestStatsRows() {
+  if (Date.now() >= zcqlBlockedUntil) {
+    try {
+      return await runZcqlQuery(
+        `SELECT * FROM ${STATS_TABLE_ID} ORDER BY MODIFIEDTIME DESC LIMIT 1`,
+      );
+    } catch (error) {
+      zcqlBlockedUntil = Date.now() + ZCQL_RETRY_AFTER_MS;
+      console.warn("[Market Stats API] ZCQL failed, reading the whole table:", {
+        message: error?.message,
+        status: error?.status,
+      });
+    }
+  }
+
+  return fetchAllStatsRows();
+}
+
 async function fetchMarketStats() {
+  return toMarketStats(await fetchLatestStatsRows());
+}
+
+async function fetchAllStatsRows() {
   const table = await getStatsTable();
 
   if (!table) {
@@ -79,6 +110,10 @@ async function fetchMarketStats() {
     nextToken = newNextToken;
   }
 
+  return rows;
+}
+
+function toMarketStats(rows) {
   if (!rows.length) {
     return {
       totalStock: null,

@@ -10,9 +10,10 @@ const ADVISORS_TABLE = "CityAdvisors";
 const MARKET_STATS_TABLE = "CityMarketStats";
 const MICROMARKETS_TABLE = "CityMicromarkets";
 
-// Rows are cached in memory for 5 minutes, so edits made in the
-// Catalyst Data Store show up on the website within a few minutes.
-const CACHE_TTL = 5 * 60 * 1000;
+// These tables change rarely, so rows are cached for 1 hour. All cities share
+// one copy of each table (3 small reads per hour in total), so edits made in
+// the Catalyst Data Store show up on the website within about an hour.
+const CACHE_TTL = 60 * 60 * 1000;
 const MAX_PAGES = 50;
 
 const CITY_ALIASES = {
@@ -280,7 +281,7 @@ export async function GET(request) {
     {
       status: 200,
       headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
       },
     },
   );

@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PropertyCard from "@/components/properties/PropertyCard";
 import { useWishlist } from "@/lib/wishlist";
+import { fetchPropertiesByIds } from "@/lib/fetchPropertiesByIds";
 import {
   Heart,
   ArrowRight,
@@ -199,6 +200,9 @@ export default function WishlistClient() {
     useState("");
   const [enquirySuccess, setEnquirySuccess] = useState(false);
   const { items, count, isInitialized } = useWishlist();
+  // Shortlists already refreshed on this page. Saving the refreshed list
+  // updates `items` again, so without this the refresh would run in a loop.
+  const repairedSelectionKeysRef = useRef(new Set());
   const [compareSelection, setCompareSelection] = useState([]);
   const [enquirySelection, setEnquirySelection] = useState([]);
   const [isEnquiryOpen, setIsEnquiryOpen] = useState(false);
@@ -219,26 +223,19 @@ export default function WishlistClient() {
     async function repairWishlist() {
       const needsRepair = items.some((property) => !getPropertyId(property) || !getCRMPropertyId(property));
       if (!needsRepair) return;
+      if (repairedSelectionKeysRef.current.has(originalSelectionKey)) return;
       try {
-        const response = await fetch("/api/properties", {
-          method: "GET",
-          cache: "no-store",
-        });
-        const data = await response.json();
-        if (!response.ok || !data?.success || !Array.isArray(data?.data)) {
-          throw new Error(
-            data?.error ||
-            data?.message ||
-            "Unable to refresh shortlisted properties.",
-          );
-        }
+        // Refresh only the shortlisted properties, not the whole inventory.
+        const freshProperties = await fetchPropertiesByIds(
+          items.map(getPropertyId).filter(Boolean),
+        );
         if (cancelled) return;
         const currentStoredItems = safeParseJSON(localStorage.getItem("anarock_wishlist_properties"),);
         if (!Array.isArray(currentStoredItems) || getSelectionKey(currentStoredItems) !== originalSelectionKey) {
           return;
         }
         const propertyMap = new Map();
-        data.data.forEach((property) => {
+        freshProperties.forEach((property) => {
           const id = getPropertyId(property);
           if (id) {
             propertyMap.set(id, property);
@@ -258,6 +255,7 @@ export default function WishlistClient() {
         if (!Array.isArray(latestStoredItems) || getSelectionKey(latestStoredItems) !== originalSelectionKey) {
           return;
         }
+        repairedSelectionKeysRef.current.add(originalSelectionKey);
         localStorage.setItem("anarock_wishlist_properties", JSON.stringify(repairedItems),);
         window.dispatchEvent(new Event("wishlist-updated"));
       } catch (error) {

@@ -15,6 +15,7 @@ import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PropertyCard from "@/components/properties/PropertyCard";
 import { usePreferences } from "@/lib/preferences";
 import { useWishlist } from "@/lib/wishlist";
+import { fetchPropertiesByIds } from "@/lib/fetchPropertiesByIds";
 import { convertCurrency, convertArea, convertRentPerArea } from "@/lib/format";
 import {
   Sparkles,
@@ -639,18 +640,10 @@ function PropertiesClientContent() {
     setEnquiryError("");
 
     try {
-      const propertiesResponse = await fetch("/api/properties", {
-        method: "GET",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      });
-      const propertiesData = await propertiesResponse.json().catch(() => ({}));
-      const refreshedProperties =
-        propertiesResponse.ok &&
-          propertiesData?.success &&
-          Array.isArray(propertiesData?.data)
-          ? propertiesData.data
-          : [];
+      // Refresh only the selected properties, not the whole inventory.
+      const refreshedProperties = await fetchPropertiesByIds(
+        shortlistedEnquirySelection.map(getPropertyId).filter(Boolean),
+      ).catch(() => []);
 
       const freshById = new Map();
       refreshedProperties.forEach((prop) => {

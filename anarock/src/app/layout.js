@@ -1,6 +1,5 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
-import Script from "next/script";
 
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -110,11 +109,6 @@ export default function RootLayout({ children }) {
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(orgJsonLd).replace(/</g, "\\u003c"),
           }}
-        />
-
-        <Script
-          src="https://static.zohocdn.com/catalyst/sdk/js/4.6.2/catalystWebSDK.js"
-          strategy="afterInteractive"
         />
 
         <WishlistProvider>

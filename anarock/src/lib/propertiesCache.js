@@ -22,7 +22,11 @@ if (!g.__anarockPropertiesCache) {
 
 const state = g.__anarockPropertiesCache;
 
-const parsedTtl = Number("600");
+// The whole Properties table is read again when this cache expires, so a
+// longer TTL means fewer Data Store calls. Default 1 hour; set
+// PROPERTIES_CACHE_TTL (seconds) to change it. While a refresh runs, visitors
+// keep getting the previous data, so pages stay fast.
+const parsedTtl = Number(process.env.PROPERTIES_CACHE_TTL || "3600");
 const CACHE_TTL =
   Number.isFinite(parsedTtl) && parsedTtl > 0 ? parsedTtl * 1000 : 900 * 1000;
 

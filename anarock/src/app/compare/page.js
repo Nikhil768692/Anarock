@@ -18,6 +18,7 @@ import { convertRentPerArea, formatArea } from "@/lib/format";
 import { usePreferences } from "@/lib/preferences";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import { useWishlist } from "@/lib/wishlist";
+import { fetchPropertiesByIds } from "@/lib/fetchPropertiesByIds";
 
 const COMPARE_STORAGE_KEY = "anarock_compare_properties";
 const MAX_COMPARE_PROPERTIES = 3;
@@ -77,6 +78,9 @@ export default function ComparePage() {
   const [isMounted, setIsMounted] = useState(false);
   const [properties, setProperties] = useState([]);
   const [allProperties, setAllProperties] = useState([]);
+  // The full list is only needed for the "add property" window, so it is
+  // loaded the first time that window opens.
+  const [allPropertiesStatus, setAllPropertiesStatus] = useState("idle");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCityFilter, setSelectedCityFilter] = useState("all");
@@ -187,14 +191,25 @@ export default function ComparePage() {
 
     async function loadCompareProperties() {
       try {
-        const response = await fetch("/api/properties", { cache: "no-store" });
-        const data = await response.json();
+        let storedIds = [];
+        try {
+          const stored = JSON.parse(
+            localStorage.getItem(COMPARE_STORAGE_KEY) || "[]",
+          );
+          storedIds = Array.isArray(stored)
+            ? stored.slice(-MAX_COMPARE_PROPERTIES).map(getId).filter(Boolean)
+            : [];
+        } catch {
+          storedIds = [];
+        }
+        if (!storedIds.length) return;
 
-        if (response.ok && data?.success && Array.isArray(data.data)) {
-          if (!cancelled) setAllProperties(data.data);
+        // Refresh only the properties being compared.
+        const freshProperties = await fetchPropertiesByIds(storedIds);
 
+        if (!cancelled) {
           const propertyMap = new Map();
-          data.data.forEach((property) => {
+          freshProperties.forEach((property) => {
             const id = getId(property);
             if (id) propertyMap.set(id, property);
           });
@@ -477,7 +492,27 @@ export default function ComparePage() {
     return Array.from(new Set(cities)).sort();
   }, [allProperties]);
 
+  const loadAllProperties = async () => {
+    if (allPropertiesStatus === "loading" || allPropertiesStatus === "loaded") {
+      return;
+    }
+    setAllPropertiesStatus("loading");
+    try {
+      const response = await fetch("/api/properties", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data?.success || !Array.isArray(data.data)) {
+        throw new Error(data?.error || "Unable to load properties.");
+      }
+      setAllProperties(data.data);
+      setAllPropertiesStatus("loaded");
+    } catch (error) {
+      console.error("Unable to load properties for comparison:", error);
+      setAllPropertiesStatus("error");
+    }
+  };
+
   const handleOpenModal = () => {
+    loadAllProperties();
     setSearchQuery("");
     setSelectedMicromarkets([]);
 
@@ -897,7 +932,23 @@ export default function ComparePage() {
             )}
 
             <div className="mt-4 flex-1 space-y-2.5 overflow-y-auto pr-1">
-              {filteredModalProperties.length === 0 ? (
+              {allPropertiesStatus === "loading" ||
+                allPropertiesStatus === "idle" ? (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  Loading properties...
+                </div>
+              ) : allPropertiesStatus === "error" ? (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  Unable to load properties.{" "}
+                  <button
+                    type="button"
+                    onClick={loadAllProperties}
+                    className="font-semibold text-[#A054A0] underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : filteredModalProperties.length === 0 ? (
                 <div className="py-12 text-center text-xs text-slate-400">
                   No properties found matching your criteria.
                 </div>

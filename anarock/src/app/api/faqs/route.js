@@ -5,9 +5,9 @@ import { getOrFetchCache } from "@/lib/cache";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// FAQ rows are cached in memory for 5 minutes, so edits made in the
-// Catalyst Data Store show up on the website within a few minutes.
-const CACHE_TTL = 5 * 60 * 1000;
+// FAQ rows change rarely, so they are cached for 1 hour. Edits made in the
+// Catalyst Data Store show up on the website within about an hour.
+const CACHE_TTL = 60 * 60 * 1000;
 const MAX_PAGES = 100;
 
 function getField(row, fieldName) {
@@ -89,7 +89,7 @@ export async function GET() {
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
         },
       },
     );
