@@ -1,17 +1,8 @@
 /** @type {import('next').NextConfig} */
-const isProduction = process.env.NODE_ENV === "production";
-// Strict-Transport-Security and X-Frame-Options are added by Catalyst Slate,
-// so they are not set here (setting them twice sent two different values).
-// Framing is still blocked by "frame-ancestors" in the Content-Security-Policy.
-
-// Scripts are allowed only from this site and the Zoho CDN.
-// 'unsafe-eval' is needed only by the development server.
-const scriptSources = [
-    "'self'",
-    "'unsafe-inline'",
-    ...(isProduction ? [] : ["'unsafe-eval'"]),
-    "https://static.zohocdn.com",
-].join(" ");
+// Strict-Transport-Security is added by the hosting platform (Vercel).
+// The page Content-Security-Policy (with a nonce per request) is set in
+// src/proxy.js. API responses get a policy that allows nothing, since they
+// are data, not pages.
 
 const securityHeaders = [
     {
@@ -31,21 +22,19 @@ const securityHeaders = [
         value: "camera=(), microphone=(), geolocation=(self), payment=()",
     },
     {
+        key: "Cross-Origin-Opener-Policy",
+        value: "same-origin",
+    },
+    {
+        key: "Cross-Origin-Resource-Policy",
+        value: "same-origin",
+    },
+];
+
+const apiHeaders = [
+    {
         key: "Content-Security-Policy",
-        value: [
-            "default-src 'self'",
-            "base-uri 'self'",
-            "object-src 'none'",
-            "frame-ancestors 'self'",
-            "form-action 'self' https:",
-            "img-src 'self' data: blob: https:",
-            "font-src 'self' data: https:",
-            "style-src 'self' 'unsafe-inline' https:",
-            `script-src ${scriptSources}`,
-            "connect-src 'self' https: wss:",
-            "frame-src 'self' https:",
-            "upgrade-insecure-requests",
-        ].join("; "),
+        value: "default-src 'none'; frame-ancestors 'none'",
     },
 ];
 
@@ -57,6 +46,10 @@ const nextConfig = {
             {
                 source: "/:path*",
                 headers: securityHeaders,
+            },
+            {
+                source: "/api/:path*",
+                headers: apiHeaders,
             },
         ];
     },

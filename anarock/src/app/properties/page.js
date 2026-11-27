@@ -1,5 +1,48 @@
 import { Suspense } from "react";
 import PropertiesClient from "./PropertiesClient";
+import { queryProperties } from "@/lib/propertyQuery";
+import { logger } from "@/lib/logger";
+
+// Must match ITEMS_PER_PAGE in PropertiesClient.
+const ITEMS_PER_PAGE = 30;
+
+// URL settings the server can apply exactly as the browser would. With any
+// other filter (budget, area, seats, micro-markets, AI search) the list is
+// still loaded in the browser, because those need the visitor's currency,
+// unit or the micro-market list.
+const SERVER_RENDERED_PARAMS = new Set(["city", "type", "sort", "page", "currency", "areaUnit"]);
+
+async function getInitialResults(params) {
+  const keys = Object.keys(params || {});
+  if (keys.some((key) => !SERVER_RENDERED_PARAMS.has(key))) return null;
+
+  const value = (key) => {
+    const raw = params[key];
+    return String(Array.isArray(raw) ? raw[0] : raw || "").trim();
+  };
+  if (value("type").toLowerCase() === "ai") return null;
+
+  const page = Math.max(1, Number.parseInt(value("page") || "1", 10) || 1);
+
+  try {
+    const result = await queryProperties({
+      city: value("city"),
+      type: value("type"),
+      sort: value("sort"),
+      page,
+      pageSize: ITEMS_PER_PAGE,
+    });
+    // With no results the browser shows suggestions, so it loads the list.
+    if (!result.data.length) return null;
+
+    const query = new URLSearchParams();
+    for (const key of keys) query.set(key, value(key));
+    return { query: query.toString(), ...result };
+  } catch (error) {
+    logger.error("[Properties page] Server list failed:", error?.message || error);
+    return null;
+  }
+}
 
 export async function generateMetadata({ searchParams }) {
   const resolvedSearchParams = await searchParams;
@@ -66,7 +109,8 @@ export async function generateMetadata({ searchParams }) {
   };
 }
 
-export default function PropertiesPage({ searchParams }) {
+export default async function PropertiesPage({ searchParams }) {
+  const initialResults = await getInitialResults(await searchParams);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "RealEstateAgent",
@@ -95,7 +139,7 @@ export default function PropertiesPage({ searchParams }) {
           <div className="mx-auto max-w-7xl text-slate-600">Loading properties...</div>
         </div>
       }>
-        <PropertiesClient />
+        <PropertiesClient initialResults={initialResults} />
       </Suspense>
     </>
   );

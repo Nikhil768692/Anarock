@@ -4,9 +4,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
+import PrivacyNotice from "@/components/common/PrivacyNotice";
 import PropertyCard from "@/components/properties/PropertyCard";
 import { useWishlist } from "@/lib/wishlist";
 import { fetchPropertiesByIds } from "@/lib/fetchPropertiesByIds";
+import {
+  SECURITY_CHECK_MESSAGE,
+  useFormGuard,
+} from "@/components/common/FormGuard";
 import {
   Heart,
   ArrowRight,
@@ -65,11 +70,6 @@ function getPropertyImageUrl(property) {
   if (!imageFolderPath) return "";
 
   return `${IMAGE_BASE_URL}/${imageFolderPath}/${DEFAULT_PROPERTY_IMAGE}`;
-}
-
-function getCRMPropertyId(property) {
-  if (!property || typeof property !== "object") return "";
-  return String(property?.crmID ?? "").trim();
 }
 
 function safeParseJSON(value) {
@@ -206,6 +206,7 @@ export default function WishlistClient() {
   const [compareSelection, setCompareSelection] = useState([]);
   const [enquirySelection, setEnquirySelection] = useState([]);
   const [isEnquiryOpen, setIsEnquiryOpen] = useState(false);
+  const enquiryGuard = useFormGuard();
   const [isSubmittingEnquiry, setIsSubmittingEnquiry] = useState(false);
   const [enquiryError, setEnquiryError] = useState("");
   const [enquiryForm, setEnquiryForm] = useState({
@@ -221,7 +222,7 @@ export default function WishlistClient() {
     let cancelled = false;
     const originalSelectionKey = getSelectionKey(items);
     async function repairWishlist() {
-      const needsRepair = items.some((property) => !getPropertyId(property) || !getCRMPropertyId(property));
+      const needsRepair = items.some((property) => !getPropertyId(property) || !property?.name);
       if (!needsRepair) return;
       if (repairedSelectionKeysRef.current.has(originalSelectionKey)) return;
       try {
@@ -356,6 +357,7 @@ export default function WishlistClient() {
     setEnquirySelection([...items]);
     setEnquiryError("");
     setEnquirySuccess(false);
+    enquiryGuard.restart();
     setIsEnquiryOpen(true);
   };
 
@@ -393,36 +395,25 @@ export default function WishlistClient() {
       return;
     }
 
+    if (!enquiryGuard.ready) {
+      setEnquiryError(SECURITY_CHECK_MESSAGE);
+      return;
+    }
+
     setIsSubmittingEnquiry(true);
     setEnquiryError("");
 
     try {
+      // The website property IDs are sent; the server finds the CRM record
+      // of each property, so CRM IDs never reach the browser.
       const selectedProperties = enquirySelection
-        .map((property) => {
-          const crmId = getCRMPropertyId(property);
-
-          if (!crmId) {
-            console.error("[ENQUIRY] Missing CRM Property ID:", property);
-            return null;
-          }
-
-          return { id: String(crmId).trim() };
-        })
-        .filter(Boolean);
+        .map((property) => String(getPropertyId(property) || "").trim())
+        .filter(Boolean)
+        .map((id) => ({ id }));
 
       if (selectedProperties.length !== enquirySelection.length) {
         throw new Error(
-          "One or more shortlisted properties do not have a valid CRM Property ID. Please refresh the shortlist and try again.",
-        );
-      }
-
-      if (
-        selectedProperties.some(
-          (property) => !/^\d+$/.test(String(property.id || "")),
-        )
-      ) {
-        throw new Error(
-          "One or more shortlisted properties have an invalid CRM Property ID.",
+          "Some shortlisted properties could not be read. Please refresh the shortlist and try again.",
         );
       }
 
@@ -481,6 +472,7 @@ export default function WishlistClient() {
         message: enquiryForm.message.trim(),
         source: "Shortlist",
         selectedProperties,
+        ...enquiryGuard.values(),
         requirementCity: lastSearchedCity || "",
         requirementType: lastRequirementType || "",
         location,
@@ -521,6 +513,7 @@ export default function WishlistClient() {
         error?.message || "Unable to submit your enquiry. Please try again.",
       );
     } finally {
+      enquiryGuard.afterSubmit();
       setIsSubmittingEnquiry(false);
     }
   };
@@ -534,7 +527,7 @@ export default function WishlistClient() {
         ]}
       />
 
-      <main className="min-h-screen bg-slate-50/50 px-4 py-6 pb-40 sm:px-6 lg:px-10">
+      <div className="min-h-screen bg-slate-50/50 px-4 py-6 pb-40 sm:px-6 lg:px-10">
         <div className="mx-auto max-w-[1600px]">
           <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
             <div>
@@ -965,6 +958,10 @@ export default function WishlistClient() {
                         </label>
                       </div>
 
+                      {enquiryGuard.fields}
+
+                      <PrivacyNotice />
+
                       {enquiryError && (
                         <div
                           role="alert"
@@ -1005,7 +1002,7 @@ export default function WishlistClient() {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 }

@@ -1,4 +1,4 @@
-import HomePage from "@/pages/HomePage";
+import HomePage from "@/components/home/HomePage";
 
 const SITE_URL = (
   process.env.NEXT_PUBLIC_BASE_URL || "https://anarock.com"

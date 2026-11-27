@@ -113,7 +113,7 @@ export default function GccCalculatorClient() {
   }, []);
 
   return (
-    <main className="min-h-screen w-full min-w-0 bg-white">
+    <div className="min-h-screen w-full min-w-0 bg-white">
       <Breadcrumbs
         items={[
           { label: "Services", href: "/services" },
@@ -143,6 +143,6 @@ export default function GccCalculatorClient() {
           }
         }}
       />
-    </main>
+    </div>
   );
 }

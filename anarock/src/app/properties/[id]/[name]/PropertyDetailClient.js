@@ -7,6 +7,10 @@ import Image from "next/image";
 import Link from "next/link";
 import PropertyCard from "@/components/properties/PropertyCard";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
+import PropertyEnquiryForm from "@/components/properties/PropertyEnquiryForm";
+import PropertyHighlights, {
+  parseAiAttributes,
+} from "@/components/properties/PropertyHighlights";
 import {
   ChevronLeft,
   MapPin,
@@ -22,6 +26,7 @@ import {
   Heart,
   ArrowUpRight,
   Building,
+  Send,
 } from "lucide-react";
 
 const AUTO_SCROLL_INTERVAL = 25000;
@@ -149,26 +154,57 @@ function DetailSection({ title, children }) {
   return (
     <section className="relative border-t border-slate-800/15 pt-6 first:border-t-0 first:pt-0 sm:pt-8">
       <div className="mb-4 flex items-center gap-2.5">
-        <h3 className="text-base font-bold tracking-tight text-black sm:text-lg">
+        <h2 className="text-base font-bold tracking-tight text-black sm:text-lg">
           {title}
-        </h3>
+        </h2>
       </div>
       {children}
     </section>
   );
 }
 
-export default function PropertyDetailClient({ propertyId }) {
-  const [property, setProperty] = useState(null);
-  const [gallery, setGallery] = useState([]);
-  const [related, setRelated] = useState([]);
-  const [activeImg, setActiveImg] = useState("project");
+function prepareGallery(images) {
+  const valid = Array.isArray(images)
+    ? images.filter(
+      (image) =>
+        image && typeof image.url === "string" && image.url.trim() !== "",
+    )
+    : [];
+  const primary =
+    valid.find((image) => image.key === "project") || valid[0] || null;
+  return { images: valid, primary };
+}
+
+export default function PropertyDetailClient({
+  propertyId,
+  initialProperty = null,
+  initialGallery = [],
+  initialRelated = [],
+}) {
+  // The server page passes the property, its images and related properties,
+  // so the content is in the first HTML. The API is used only as a fallback.
+  const [initial] = useState(() => {
+    const { images, primary } = prepareGallery(initialGallery);
+    return {
+      property: initialProperty
+        ? { ...initialProperty, image: primary?.url || "" }
+        : null,
+      images,
+      activeKey: primary?.key || "",
+    };
+  });
+  const [property, setProperty] = useState(initial.property);
+  const [gallery, setGallery] = useState(initial.images);
+  const [related] = useState(() =>
+    Array.isArray(initialRelated) ? initialRelated : [],
+  );
+  const [activeImg, setActiveImg] = useState(initial.activeKey);
   const [failedImages, setFailedImages] = useState(() => new Set());
   // Images that failed through the image optimizer and are retried by
   // loading the original file directly from Stratus.
   const [directImages, setDirectImages] = useState(() => new Set());
   const { unit, currency, exchangeRates } = usePreferences();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial.property);
   const [error, setError] = useState("");
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [compareSelection, setCompareSelection] = useState([]);
@@ -208,7 +244,7 @@ export default function PropertyDetailClient({ propertyId }) {
   }, []);
 
   useEffect(() => {
-    if (!propertyId) return;
+    if (!propertyId || initial.property) return;
     const controller = new AbortController();
     async function loadProperty() {
       try {
@@ -224,86 +260,12 @@ export default function PropertyDetailClient({ propertyId }) {
           throw new Error(data.error || "Failed to load property");
         }
 
-        const propertyData = data.data;
-        const images = Array.isArray(data.galleryImages)
-          ? data.galleryImages.filter(
-            (image) =>
-              image &&
-              typeof image.url === "string" &&
-              image.url.trim() !== "",
-          )
-          : [];
-        const primaryImage =
-          images.find((image) => image.key === "project") || images[0] || null;
-        setProperty({ ...propertyData, image: primaryImage?.url || "" });
+        const { images, primary } = prepareGallery(data.galleryImages);
+        setProperty({ ...data.data, image: primary?.url || "" });
         setGallery(images);
         setFailedImages(new Set());
         setDirectImages(new Set());
-        setActiveImg(primaryImage?.key || "");
-
-        try {
-          const allResponse = await fetch(`/api/properties`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const allData = await allResponse.json();
-
-          if (allData.success) {
-            const currentId = getPropertyId(propertyData);
-            const otherProperties = (allData.data || []).filter(
-              (item) => getPropertyId(item) !== currentId,
-            );
-            const scoredProperties = otherProperties.map((item) => {
-              let score = 0;
-              if (
-                propertyData.city &&
-                item.city &&
-                item.city.trim().toLowerCase() ===
-                propertyData.city.trim().toLowerCase()
-              ) {
-                score += 100;
-              }
-              if (
-                propertyData.micromarket &&
-                item.micromarket &&
-                item.micromarket.trim().toLowerCase() ===
-                propertyData.micromarket.trim().toLowerCase()
-              ) {
-                score += 50;
-              }
-              const currentType = normalizeType(
-                propertyData.officeType ||
-                propertyData.propertyType ||
-                propertyData.type,
-              );
-              const itemType = normalizeType(
-                item.officeType || item.propertyType || item.type,
-              );
-              if (currentType && itemType && currentType === itemType) {
-                score += 25;
-              }
-              const currentRent = Number(
-                propertyData.quotedRent || propertyData.monthlyCostPerSeat || 0,
-              );
-              const itemRent = Number(
-                item.quotedRent || item.monthlyCostPerSeat || 0,
-              );
-              if (currentRent > 0 && itemRent > 0) {
-                const diffRatio =
-                  Math.abs(currentRent - itemRent) / currentRent;
-                if (diffRatio < 0.5) score += 10;
-              }
-
-              return { item, score };
-            });
-            scoredProperties.sort((a, b) => b.score - a.score);
-            setRelated(scoredProperties.map((p) => p.item));
-          }
-        } catch (relatedError) {
-          if (relatedError.name !== "AbortError") {
-            console.error("All properties fetch error:", relatedError);
-          }
-        }
+        setActiveImg(primary?.key || "");
       } catch (err) {
         if (err.name !== "AbortError") {
           console.error(err);
@@ -319,7 +281,7 @@ export default function PropertyDetailClient({ propertyId }) {
     return () => {
       controller.abort();
     };
-  }, [propertyId]);
+  }, [propertyId, initial.property]);
 
   const { row1, row2 } = useMemo(() => {
     const r1 = [];
@@ -604,12 +566,12 @@ export default function PropertyDetailClient({ propertyId }) {
     return {
       isCoworking: isCoworkingProperty(property),
       propertyType: getValue(property, ["officeType"], "Conventional"),
-      managedBy: getValue(property, ["OperatorName"]),
+      managedBy: getValue(property, ["operator"]),
       offeredSeats: getValue(property, ["NoOfSeatsOffered"]),
       seatPrice: getValue(property, ["monthlyCostPerSeat"]),
       quotedRent: getValue(property, ["quotedRent"]),
       towerFloor: getValue(property, ["floor"]),
-      areaOffered: getValue(property, ["TotalLeasableAreaAvailable"]),
+      areaOffered: getValue(property, ["totalLeasableAreaAvailable"]),
       availability: getValue(property, ["availability"]),
       buildingCertification: getValue(property, ["buildingCertifications"]),
       buildingStructure: getValue(property, ["buildingStructure"]),
@@ -618,6 +580,11 @@ export default function PropertyDetailClient({ propertyId }) {
       airport: getValue(property, ["distanceFromAirport"]),
     };
   }, [property]);
+
+  const hasHighlights = useMemo(
+    () => Boolean(parseAiAttributes(property?.aiAttributes)),
+    [property?.aiAttributes],
+  );
 
   const areaValue = Number(property?.totalLeasableAreaAvailable);
   const hasArea = Number.isFinite(areaValue) && areaValue > 0;
@@ -672,8 +639,8 @@ export default function PropertyDetailClient({ propertyId }) {
         ]}
       />
 
-      <main
-        className={`min-h-screen overflow-x-clip px-3 py-4 sm:px-5 sm:py-6 lg:px-8 xl:px-10 ${compareSelection.length > 0 ? "pb-24 sm:pb-28" : "pb-12 sm:pb-16"
+      <div
+        className={`property-detail-page min-h-screen overflow-x-clip px-3 py-4 sm:px-5 sm:py-6 lg:px-8 xl:px-10 ${compareSelection.length > 0 ? "pb-24 sm:pb-28" : "pb-12 sm:pb-16"
           }`}
       >
         <style jsx global>{`
@@ -712,13 +679,13 @@ export default function PropertyDetailClient({ propertyId }) {
             display: none;
           }
           @media (prefers-reduced-motion: no-preference) {
-            main > div > section {
+            .property-detail-page > div > section {
               animation: fadeInSlide 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
-            main > div > section:nth-of-type(2) {
+            .property-detail-page > div > section:nth-of-type(2) {
               animation-delay: 60ms;
             }
-            main > div > section:nth-of-type(3) {
+            .property-detail-page > div > section:nth-of-type(3) {
               animation-delay: 100ms;
             }
           }
@@ -768,6 +735,19 @@ export default function PropertyDetailClient({ propertyId }) {
               </div>
 
               <div className="flex w-full min-w-0 shrink-0 items-center gap-2.5 lg:w-auto">
+                <a
+                  href="#enquire"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    const section = document.getElementById("enquire");
+                    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    section?.querySelector("input")?.focus({ preventScroll: true });
+                  }}
+                  className="inline-flex min-h-[40px] min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-[#8f3d8a] px-4 py-2 text-base font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#7a3376] active:scale-[0.98] sm:flex-none"
+                >
+                  <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Enquire</span>
+                </a>
                 <button
                   type="button"
                   onClick={handleCompareToggle}
@@ -836,7 +816,7 @@ export default function PropertyDetailClient({ propertyId }) {
                         onError={() => handleImageError(activeImageItem?.key)}
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                      <div className="flex h-full items-center justify-center text-xs text-slate-600">
                         Image unavailable
                       </div>
                     )}
@@ -1060,6 +1040,32 @@ export default function PropertyDetailClient({ propertyId }) {
                 </div>
               </DetailSection>
             </div>
+
+            {hasHighlights && (
+              <div className="mt-6 sm:mt-7">
+                <DetailSection title="About this property">
+                  <PropertyHighlights aiAttributes={property.aiAttributes} />
+                </DetailSection>
+              </div>
+            )}
+          </section>
+
+          <section
+            id="enquire"
+            aria-labelledby="enquire-title"
+            className="mt-5 scroll-mt-28 rounded-xl border border-slate-800/15 bg-white p-5 shadow-sm sm:mt-6 sm:p-7 lg:mt-8 lg:p-8"
+          >
+            <h2
+              id="enquire-title"
+              className="text-base font-bold tracking-tight text-black sm:text-lg"
+            >
+              Enquire about this property
+            </h2>
+            <p className="mb-5 mt-1 text-sm text-slate-700">
+              Share your details and our team will contact you about{" "}
+              {property.name || "this property"}.
+            </p>
+            <PropertyEnquiryForm property={property} />
           </section>
           {related.length > 0 && (
             <section
@@ -1078,8 +1084,7 @@ export default function PropertyDetailClient({ propertyId }) {
                     You Might Also Be Interested In
                   </h2>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    Showing all available listings prioritized by location,
-                    type, and rent.
+                    Similar listings, matched by location, type and rent.
                   </p>
                 </div>
 
@@ -1260,7 +1265,7 @@ export default function PropertyDetailClient({ propertyId }) {
             </div>
           </div>
         )}
-      </main>
+      </div>
     </>
   );
 }

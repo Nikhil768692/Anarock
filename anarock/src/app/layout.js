@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
+import { connection } from "next/server";
 
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -81,7 +82,10 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  // Pages are rendered per request so each gets its own CSP nonce (src/proxy.js).
+  await connection();
+
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "RealEstateAgent",
@@ -111,9 +115,17 @@ export default function RootLayout({ children }) {
           }}
         />
 
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[1000] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-black focus:shadow-lg"
+        >
+          Skip to main content
+        </a>
         <WishlistProvider>
           <Navbar />
-          <main className="min-h-screen">{children}</main>
+          <main id="main-content" tabIndex={-1} className="min-h-screen outline-none">
+            {children}
+          </main>
           <Footer />
         </WishlistProvider>
       </body>

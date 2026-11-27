@@ -1,5 +1,6 @@
 import { getPropertiesTable } from "@/lib/catalyst";
 import { mapProperty } from "@/lib/propertyMapper";
+import { logger } from "@/lib/logger";
 
 const g = globalThis;
 
@@ -106,7 +107,7 @@ async function fetchAllFromCatalyst() {
     }
     nextToken = fetchedToken;
   }
-  console.log(`[PropertiesCache] Catalyst returned ${rows.length} rows.`);
+  logger.info(`[PropertiesCache] Catalyst returned ${rows.length} rows.`);
   const properties = [];
   for (const row of rows) {
     try {
@@ -120,7 +121,7 @@ async function fetchAllFromCatalyst() {
       }
       properties.push(property);
     } catch (error) {
-      console.error(
+      logger.error(
         "[PropertiesCache] Property mapping failed:",
         error?.message || error,
       );
@@ -190,14 +191,14 @@ function startRefresh() {
       state.lastRefreshError = null;
       state.lastRefreshErrorAt = 0;
       state.nextRefreshAllowedAt = 0;
-      console.log(`[PropertiesCache] Cached ${properties.length} properties.`);
+      logger.info(`[PropertiesCache] Cached ${properties.length} properties.`);
       return properties;
     })
     .catch((error) => {
       state.lastRefreshError = error?.message || String(error);
       state.lastRefreshErrorAt = Date.now();
       state.nextRefreshAllowedAt = Date.now() + REFRESH_RETRY_COOLDOWN_MS;
-      console.error("[PropertiesCache] Refresh failed:", state.lastRefreshError,);
+      logger.error("[PropertiesCache] Refresh failed:", state.lastRefreshError,);
       throw error;
     })
     .finally(() => {

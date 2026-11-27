@@ -194,7 +194,7 @@ function PropertyCard({
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[#F3F1EE] text-[#9B948C]">
+              <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[#F3F1EE] text-[#5E5852]">
                 <Building2 className="h-6 w-6 stroke-[1.5]" />
                 <span className="text-xs font-medium">Image unavailable</span>
               </div>

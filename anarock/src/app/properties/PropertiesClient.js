@@ -9,13 +9,16 @@ import {
   useRef,
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PropertyCard from "@/components/properties/PropertyCard";
+import EnquiryModal from "./EnquiryModal";
+import ExclusiveLeadModal from "./ExclusiveLeadModal";
 import { usePreferences } from "@/lib/preferences";
 import { useWishlist } from "@/lib/wishlist";
-import { fetchPropertiesByIds } from "@/lib/fetchPropertiesByIds";
+import {
+  SECURITY_CHECK_MESSAGE,
+  useFormGuard,
+} from "@/components/common/FormGuard";
 import { convertCurrency, convertArea, convertRentPerArea } from "@/lib/format";
 import {
   Sparkles,
@@ -34,371 +37,32 @@ import {
   DollarSign,
   Euro,
   MessageSquare,
-  Loader2,
-  CheckCircle2,
   ArrowRight,
   Heart,
-  Building,
-  MapPin,
-  ExternalLink,
-  User,
-  Phone,
-  Building2,
-  Mail,
 
 } from "lucide-react";
+import { PHONE_COUNTRIES as EXCLUSIVE_PHONE_COUNTRIES } from "@/lib/phoneCountries";
+import {
+  MAX_COMPARE_PROPERTIES,
+  MIN_COMPARE_PROPERTIES,
+  COMPARE_STORAGE_KEY,
+  OFFICE_TYPES,
+  SORT_CATEGORIES,
+  PropertyCardSkeleton,
+  toUrlValue,
+  normalizeValue,
+  getOfficeTypeFromUrl,
+  getPropertyId,
+  getLastSearchedCityFromStorage,
+  getRequirementTypeFromStorage,
+  getEnquiryPropertyCity,
+  getEnquiryPropertyType,
+  getStoredUserLocation,
+  FilterNumberInput,
+} from "./propertiesShared";
 
-// Same country list as the home page requirement form.
-const EXCLUSIVE_PHONE_COUNTRIES = [
-  { name: "India", code: "IN", dial: "+91", flag: "🇮🇳", min: 10, max: 10 },
-  { name: "United States", code: "US", dial: "+1", flag: "🇺🇸", min: 10, max: 10 },
-  { name: "Canada", code: "CA", dial: "+1", flag: "🇨🇦", min: 10, max: 10 },
-  { name: "United Kingdom", code: "GB", dial: "+44", flag: "🇬🇧", min: 10, max: 10 },
-  { name: "United Arab Emirates", code: "AE", dial: "+971", flag: "🇦🇪", min: 9, max: 9 },
-  { name: "Australia", code: "AU", dial: "+61", flag: "🇦🇺", min: 9, max: 9 },
-  { name: "Singapore", code: "SG", dial: "+65", flag: "🇸🇬", min: 8, max: 8 },
-  { name: "Germany", code: "DE", dial: "+49", flag: "🇩🇪", min: 10, max: 11 },
-  { name: "France", code: "FR", dial: "+33", flag: "🇫🇷", min: 9, max: 9 },
-  { name: "Italy", code: "IT", dial: "+39", flag: "🇮🇹", min: 9, max: 10 },
-  { name: "Spain", code: "ES", dial: "+34", flag: "🇪🇸", min: 9, max: 9 },
-  { name: "Netherlands", code: "NL", dial: "+31", flag: "🇳🇱", min: 9, max: 9 },
-  { name: "Switzerland", code: "CH", dial: "+41", flag: "🇨🇭", min: 9, max: 9 },
-  { name: "Ireland", code: "IE", dial: "+353", flag: "🇮🇪", min: 9, max: 9 },
-  { name: "New Zealand", code: "NZ", dial: "+64", flag: "🇳🇿", min: 8, max: 10 },
-  { name: "Japan", code: "JP", dial: "+81", flag: "🇯🇵", min: 10, max: 10 },
-  { name: "South Korea", code: "KR", dial: "+82", flag: "🇰🇷", min: 9, max: 10 },
-  { name: "China", code: "CN", dial: "+86", flag: "🇨🇳", min: 11, max: 11 },
-  { name: "Hong Kong", code: "HK", dial: "+852", flag: "🇭🇰", min: 8, max: 8 },
-  { name: "Malaysia", code: "MY", dial: "+60", flag: "🇲🇾", min: 9, max: 10 },
-  { name: "Thailand", code: "TH", dial: "+66", flag: "🇹🇭", min: 9, max: 9 },
-  { name: "Israel", code: "IL", dial: "+972", flag: "🇮🇱", min: 9, max: 9 },
-  { name: "Indonesia", code: "ID", dial: "+62", flag: "🇮🇩", min: 9, max: 12 },
-  { name: "Philippines", code: "PH", dial: "+63", flag: "🇵🇭", min: 10, max: 10 },
-  { name: "Vietnam", code: "VN", dial: "+84", flag: "🇻🇳", min: 9, max: 10 },
-  { name: "South Africa", code: "ZA", dial: "+27", flag: "🇿🇦", min: 9, max: 9 },
-  { name: "Saudi Arabia", code: "SA", dial: "+966", flag: "🇸🇦", min: 9, max: 9 },
-  { name: "Qatar", code: "QA", dial: "+974", flag: "🇶🇦", min: 8, max: 8 },
-  { name: "Kuwait", code: "KW", dial: "+965", flag: "🇰🇼", min: 8, max: 8 },
-  { name: "Oman", code: "OM", dial: "+968", flag: "🇴🇲", min: 8, max: 8 },
-  { name: "Bahrain", code: "BH", dial: "+973", flag: "🇧🇭", min: 8, max: 8 },
-  { name: "Pakistan", code: "PK", dial: "+92", flag: "🇵🇰", min: 10, max: 10 },
-  { name: "Bangladesh", code: "BD", dial: "+880", flag: "🇧🇩", min: 10, max: 10 },
-  { name: "Nepal", code: "NP", dial: "+977", flag: "🇳🇵", min: 10, max: 10 },
-  { name: "Sri Lanka", code: "LK", dial: "+94", flag: "🇱🇰", min: 9, max: 9 },
-  { name: "Russia", code: "RU", dial: "+7", flag: "🇷🇺", min: 10, max: 10 },
-  { name: "Brazil", code: "BR", dial: "+55", flag: "🇧🇷", min: 10, max: 11 },
-  { name: "Mexico", code: "MX", dial: "+52", flag: "🇲🇽", min: 10, max: 10 },
-  { name: "Argentina", code: "AR", dial: "+54", flag: "🇦🇷", min: 10, max: 11 },
-  { name: "Turkey", code: "TR", dial: "+90", flag: "🇹🇷", min: 10, max: 10 },
-];
 
-const MAX_COMPARE_PROPERTIES = 3;
-const MIN_COMPARE_PROPERTIES = 2;
-const COMPARE_STORAGE_KEY = "anarock_compare_properties";
-const IMAGE_BASE_URL = "https://property-images.zohostratus.in";
-const IMAGE_EXTENSIONS = [
-  "jpg",
-  "jpeg",
-  "png",
-  "webp",
-  "avif",
-  "gif",
-  "bmp",
-  "tif",
-  "tiff",
-  "svg",
-];
-const IMAGE_FILES = [
-  {
-    key: "project",
-    name: "Project Picture 1",
-    filename: "Project_Picture_1.jpg",
-  },
-  {
-    key: "property-1",
-    name: "Property Photo 1",
-    filename: "Property_Photo_1.jpg",
-  },
-];
-
-const OFFICE_TYPES = ["Conventional", "Managed Office/Co-working"];
-const SORT_CATEGORIES = [
-  { id: "recommended", label: "Recommended", value: "" },
-  {
-    id: "budget",
-    label: "Budget",
-    ascVal: "budget_asc",
-    descVal: "budget_desc",
-  },
-  {
-    id: "seats",
-    label: "Seat Count",
-    ascVal: "seats_asc",
-    descVal: "seats_desc",
-  },
-  { id: "area", label: "Area", ascVal: "area_asc", descVal: "area_desc" },
-  {
-    id: "name",
-    label: "Alphabetically",
-    ascVal: "name_asc",
-    descVal: "name_desc",
-  },
-];
-
-function PropertyCardSkeleton() {
-  return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-800/25 bg-white p-3.5 shadow-sm">
-      <div className="shimmer-effect relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-slate-100" />
-      <div className="flex flex-1 flex-col px-1.5 pb-1 pt-3.5">
-        <div className="shimmer-effect h-3 w-1/3 rounded bg-slate-100" />
-        <div className="shimmer-effect mt-2.5 h-5 w-4/5 rounded bg-slate-100" />
-        <div className="shimmer-effect mt-2 h-3.5 w-1/2 rounded bg-slate-100" />
-        <div className="my-4 h-px bg-slate-100" />
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <div className="shimmer-effect h-2.5 w-12 rounded bg-slate-100" />
-            <div className="shimmer-effect mt-1.5 h-4 w-20 rounded bg-slate-100" />
-          </div>
-          <div className="border-l border-slate-100 pl-3">
-            <div className="shimmer-effect h-2.5 w-12 rounded bg-slate-100" />
-            <div className="shimmer-effect mt-1.5 h-4 w-20 rounded bg-slate-100" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const toUrlValue = (value) => {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[\/\\]+/g, "-")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-};
-
-const normalizeValue = (value) => {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-};
-
-const getOfficeTypeFromUrl = (value) => {
-  if (!value) return "";
-  const normalized = normalizeValue(value);
-  const match = OFFICE_TYPES.find(
-    (type) =>
-      normalizeValue(type) === normalized ||
-      toUrlValue(type) === String(value).toLowerCase(),
-  );
-  return match || value;
-};
-
-const getPropertyId = (property) =>
-  String(property?.id || "");
-
-function getPropertySlug(property) {
-  if (!property || typeof property !== "object") return "";
-  const rawSlug = property?.slug ?? "";
-  return String(rawSlug)
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function getPropertyImageUrl(property) {
-  if (!property || typeof property !== "object") return "";
-  if (property.image) return property.image;
-  if (property.coverImage) return property.coverImage;
-  if (Array.isArray(property.images) && property.images.length > 0) {
-    return property.images[0];
-  }
-  const imageFolderPath = String(property.ImageFolderPath || "").replace(/^\/+|\/+$/g, "");
-  if (!imageFolderPath) return "";
-  const projectImage = IMAGE_FILES.find((img) => img.key === "project");
-  const filename = projectImage
-    ? projectImage.filename
-    : "Project_Picture_1.jpg";
-  return `${IMAGE_BASE_URL}/${imageFolderPath}/${filename}`;
-}
-
-function getCRMPropertyId(property) {
-  if (!property || typeof property !== "object") return "";
-  const possibleIds = [
-    property.crmID,
-    property.crmId,
-    property.CRM_ID,
-    property.zohoPropertyId,
-    property.zoho_property_id,
-    property.Property_CRM_ID,
-    property.propertyCRMId,
-  ];
-
-  for (const value of possibleIds) {
-    const id = String(value ?? "").trim();
-    if (id) return id;
-  }
-  return "";
-}
-
-function readLocalStorageValue(keys) {
-  if (typeof window === "undefined") return "";
-  for (const key of keys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw || !raw.trim()) continue;
-      try {
-        const parsed = JSON.parse(raw);
-        if (typeof parsed === "string" || typeof parsed === "number") {
-          return String(parsed).trim();
-        }
-        if (parsed && typeof parsed === "object") {
-          const value =
-            parsed.city ||
-            parsed.City ||
-            parsed.name ||
-            parsed.Name ||
-            parsed.value;
-          if (value) return String(value).trim();
-        }
-      } catch {
-        return raw.trim();
-      }
-      return raw.trim();
-    } catch (error) {
-      console.error("Unable to read storage key:", key, error);
-    }
-  }
-  return "";
-}
-
-function getLastSearchedCityFromStorage() {
-  return readLocalStorageValue([
-    "anarock_last_searched_city",
-    "lastSearchedCity",
-    "last_searched_city",
-    "requirementCity",
-    "requirement_city",
-    "selectedCity",
-    "selected_city",
-    "propertyCity",
-    "property_city",
-    "searchCity",
-    "search_city",
-  ]);
-}
-
-function getRequirementTypeFromStorage() {
-  return readLocalStorageValue([
-    "anarock_requirement_type",
-    "requirementType",
-    "requirement_type",
-    "propertyType",
-    "property_type",
-    "selectedPropertyType",
-    "selected_property_type",
-    "searchPropertyType",
-    "search_property_type",
-  ]);
-}
-
-function getEnquiryPropertyCity(property) {
-  return String(property?.city ?? "").trim();
-}
-
-function getEnquiryPropertyType(property) {
-  return String(property?.officeType ?? "").trim();
-}
-
-function getStoredUserLocation() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem("anarock_user_location");
-    if (!raw) return null;
-    const location = JSON.parse(raw);
-    return {
-      street: String(
-        location?.area || location?.street || location?.address || "",
-      ).trim(),
-      city: String(location?.city || "").trim(),
-      state: String(location?.state || location?.province || "").trim(),
-      country: String(location?.country || "").trim(),
-      postalCode: String(
-        location?.pincode ||
-        location?.postalCode ||
-        location?.postal_code ||
-        "",
-      ).trim(),
-      latitude: location?.latitude ?? null,
-      longitude: location?.longitude ?? null,
-    };
-  } catch (error) {
-    console.error("Unable to read saved user location:", error);
-    return null;
-  }
-}
-
-// Number box for the filter panel. Typing only changes the box; the filter
-// (and the search) runs once the visitor stops typing for a moment, presses
-// Enter or leaves the box, instead of on every key.
-const FILTER_TYPING_DELAY_MS = 700;
-
-function FilterNumberInput({ value, onCommit, ...inputProps }) {
-  const [draft, setDraft] = useState(value ?? "");
-  const timerRef = useRef(null);
-  const committedRef = useRef(value ?? "");
-
-  // Follow outside changes (chip removed, Clear all, back button). The value
-  // this box just sent is skipped, so text typed meanwhile is kept.
-  useEffect(() => {
-    const nextValue = value ?? "";
-    if (String(nextValue) === String(committedRef.current)) return;
-    committedRef.current = nextValue;
-    clearTimeout(timerRef.current);
-    setDraft(nextValue);
-  }, [value]);
-
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
-  const commit = (nextValue) => {
-    clearTimeout(timerRef.current);
-    if (String(nextValue) === String(committedRef.current)) return;
-    committedRef.current = nextValue;
-    onCommit(nextValue);
-  };
-
-  return (
-    <input
-      {...inputProps}
-      type="number"
-      min="0"
-      value={draft}
-      onChange={(event) => {
-        const nextValue = event.target.value;
-        setDraft(nextValue);
-        clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(
-          () => commit(nextValue),
-          FILTER_TYPING_DELAY_MS,
-        );
-      }}
-      onBlur={() => commit(draft)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          commit(draft);
-        }
-      }}
-    />
-  );
-}
-
-function PropertiesClientContent() {
+function PropertiesClientContent({ initialResults = null }) {
   const { currency, unit, exchangeRates } = usePreferences();
   const [suggestionsHasMore, setSuggestionsHasMore] = useState(false);
   const [suggestionsPage, setSuggestionsPage] = useState(1);
@@ -408,6 +72,8 @@ function PropertiesClientContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isExclusiveLeadOpen, setIsExclusiveLeadOpen] = useState(false);
+  const enquiryGuard = useFormGuard();
+  const exclusiveGuard = useFormGuard();
   const [isSubmittingExclusiveLead, setIsSubmittingExclusiveLead] = useState(false);
   const [exclusiveLeadSuccess, setExclusiveLeadSuccess] = useState(false);
   const [exclusiveLeadError, setExclusiveLeadError] = useState("");
@@ -432,11 +98,21 @@ function PropertiesClientContent() {
   const compareSelectionRef = useRef([]);
   const [suggestedProperties, setSuggestedProperties] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchCompleted, setSearchCompleted] = useState(false);
-  const [totalProperties, setTotalProperties] = useState(0);
-  const [totalPagesFromApi, setTotalPagesFromApi] = useState(1);
+  // The server page may pass the first list (see properties/page.js), so the
+  // listings are in the HTML. It is used while the address stays the same.
+  const hasInitialResults = Array.isArray(initialResults?.data);
+  const initialQueryRef = useRef(hasInitialResults ? initialResults.query : null);
+  const [properties, setProperties] = useState(() =>
+    hasInitialResults ? initialResults.data : [],
+  );
+  const [loading, setLoading] = useState(!hasInitialResults);
+  const [searchCompleted, setSearchCompleted] = useState(hasInitialResults);
+  const [totalProperties, setTotalProperties] = useState(() =>
+    hasInitialResults ? Number(initialResults.total || 0) : 0,
+  );
+  const [totalPagesFromApi, setTotalPagesFromApi] = useState(() =>
+    hasInitialResults ? Math.max(1, Number(initialResults.totalPages || 1)) : 1,
+  );
   const [error, setError] = useState("");
   const [cities, setCities] = useState([]);
   const [micromarkets, setMicromarkets] = useState([]);
@@ -459,7 +135,10 @@ function PropertiesClientContent() {
   // and larger screens, and as a small button on phones.
   const [exclusiveCardOpen, setExclusiveCardOpen] = useState(true);
   // Cards shown (faded) while the AI search asks which micro-market is meant.
-  const shownPropertiesRef = useRef([]);
+  const aiResultsRef = useRef(new Map());
+  const shownPropertiesRef = useRef(
+    hasInitialResults ? initialResults.data : [],
+  );
   const canCompare = compareSelection.length >= MIN_COMPARE_PROPERTIES &&
     compareSelection.length <= MAX_COMPARE_PROPERTIES;
   const remainingToCompare = Math.max(0, MIN_COMPARE_PROPERTIES - compareSelection.length,);
@@ -596,6 +275,7 @@ function PropertiesClientContent() {
     setEnquirySelection(selectionToUse);
     setEnquiryError("");
     setEnquirySuccess(false);
+    enquiryGuard.restart();
     setIsEnquiryOpen(true);
   };
 
@@ -636,34 +316,22 @@ function PropertiesClientContent() {
       );
       return;
     }
+    if (!enquiryGuard.ready) {
+      setEnquiryError(SECURITY_CHECK_MESSAGE);
+      return;
+    }
     setIsSubmittingEnquiry(true);
     setEnquiryError("");
 
     try {
-      // Refresh only the selected properties, not the whole inventory.
-      const refreshedProperties = await fetchPropertiesByIds(
-        shortlistedEnquirySelection.map(getPropertyId).filter(Boolean),
-      ).catch(() => []);
+      const resolvedSelection = shortlistedEnquirySelection;
 
-      const freshById = new Map();
-      refreshedProperties.forEach((prop) => {
-        const id = getPropertyId(prop);
-        if (id) freshById.set(String(id), prop);
-      });
-
-      const resolvedSelection = shortlistedEnquirySelection.map((prop) => {
-        const id = getPropertyId(prop);
-        const fresh = id ? freshById.get(String(id)) : null;
-        return fresh ? { ...prop, ...fresh } : prop;
-      });
-
-      const selectedProperties = resolvedSelection.map((prop) => {
-        const crmId = String(getCRMPropertyId(prop) || "").trim();
-        if (!crmId || !/^\d+$/.test(crmId)) {
-          throw new Error("A selected property is missing its CRM record ID.");
-        }
-        return { id: crmId };
-      });
+      // The website property IDs are sent; the server finds the CRM record
+      // of each property, so CRM IDs never reach the browser.
+      const selectedProperties = resolvedSelection
+        .map((prop) => String(getPropertyId(prop) || "").trim())
+        .filter(Boolean)
+        .map((id) => ({ id }));
 
       const requirementCity =
         getLastSearchedCityFromStorage() ||
@@ -700,6 +368,7 @@ function PropertiesClientContent() {
         selectedProperties,
         requirementCity,
         requirementType,
+        ...enquiryGuard.values(),
         location: {
           street: savedLocation.street || "",
           city: savedLocation.city || "",
@@ -745,6 +414,7 @@ function PropertiesClientContent() {
         err?.message || "Unable to submit your enquiry. Please try again.",
       );
     } finally {
+      enquiryGuard.afterSubmit();
       setIsSubmittingEnquiry(false);
     }
   };
@@ -844,6 +514,11 @@ function PropertiesClientContent() {
 
     const phone = `${exclusiveCountry.dial}${phoneDigits}`;
 
+    if (!exclusiveGuard.ready) {
+      setExclusiveLeadError(SECURITY_CHECK_MESSAGE);
+      return;
+    }
+
     setIsSubmittingExclusiveLead(true);
     setExclusiveLeadError("");
 
@@ -856,6 +531,7 @@ function PropertiesClientContent() {
         email,
         company,
         source: "Exclusive Properties Enquiry",
+        ...exclusiveGuard.values(),
         requirementCity:
           getLastSearchedCityFromStorage() ||
           resolvedCity ||
@@ -905,6 +581,7 @@ function PropertiesClientContent() {
         err?.message || "Unable to submit your request. Please try again.",
       );
     } finally {
+      exclusiveGuard.afterSubmit();
       setIsSubmittingExclusiveLead(false);
     }
   };
@@ -1088,6 +765,14 @@ function PropertiesClientContent() {
   }, [selectedMicromarkets, micromarkets]);
 
   useEffect(() => {
+    // Keep the server-rendered list while the address is unchanged.
+    if (initialQueryRef.current !== null) {
+      if (searchParams.toString() === initialQueryRef.current) {
+        return undefined;
+      }
+      initialQueryRef.current = null;
+    }
+
     const controller = new AbortController();
 
     async function fetchPropertiesWithRetry(retries = 1) {
@@ -1189,7 +874,17 @@ function PropertiesClientContent() {
           params.set("prompt", prompt);
         }
 
-        const response = shouldUseAi
+        // One AI search is one request: the answer is kept for the address
+        // the page moves to next and reused when the page re-renders.
+        const aiKeyFor = (query) =>
+          `${query}|${aiConfirmedCity}|${aiConfirmedMicromarket}`;
+        const cachedAi = shouldUseAi
+          ? aiResultsRef.current.get(aiKeyFor(searchParams.toString()))
+          : null;
+
+        const response = cachedAi
+          ? null
+          : shouldUseAi
           ? await fetch("/api/ai-search", {
             method: "POST",
             headers: {
@@ -1216,7 +911,7 @@ function PropertiesClientContent() {
             signal: controller.signal,
           });
 
-        const data = await response.json().catch(() => ({}));
+        const data = cachedAi || (await response.json().catch(() => ({})));
 
         if (controller.signal.aborted) return;
 
@@ -1253,7 +948,7 @@ function PropertiesClientContent() {
           return;
         }
 
-        if (!response.ok || !data.success) {
+        if ((response && !response.ok) || !data.success) {
           throw new Error(data.error || "Failed to fetch properties");
         }
 
@@ -1303,6 +998,11 @@ function PropertiesClientContent() {
           nextParams.set("aiResolved", "1");
           nextParams.delete("page");
 
+          if (currentPage === 1) {
+            if (aiResultsRef.current.size > 20) aiResultsRef.current.clear();
+            aiResultsRef.current.set(aiKeyFor(nextParams.toString()), data);
+          }
+
           setLoading(false);
 
           if (nextParams.toString() !== searchParams.toString()) {
@@ -1314,6 +1014,11 @@ function PropertiesClientContent() {
         }
 
         setAiClarification(null);
+
+        if (shouldUseAi && !cachedAi) {
+          if (aiResultsRef.current.size > 20) aiResultsRef.current.clear();
+          aiResultsRef.current.set(aiKeyFor(searchParams.toString()), data);
+        }
 
         const nextProperties = Array.isArray(data.data) ? data.data : [];
         setProperties(nextProperties);
@@ -2253,7 +1958,7 @@ function PropertiesClientContent() {
 
       <Breadcrumbs items={breadcrumbs} />
 
-      <main className="mx-auto max-w-[1600px] px-3 py-3 sm:px-3 lg:px-4">
+      <div className="mx-auto max-w-[1600px] px-3 py-3 sm:px-3 lg:px-4">
         <div className="mb-6 space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
@@ -2279,6 +1984,7 @@ function PropertiesClientContent() {
                     : ""
                   }`}
               </p>
+              <h2 className="sr-only">Property results</h2>
             </div>
 
             <form
@@ -2561,12 +2267,13 @@ function PropertiesClientContent() {
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                    <label htmlFor="filter-field-1" className="mb-1.5 block text-xs font-semibold text-slate-700">
                       City
                     </label>
                     {/* Native arrow hidden so it lines up with the Micromarket arrow. */}
                     <div className="relative">
                     <select
+                      id="filter-field-1"
                       value={resolvedCity}
                       onChange={(e) => handleCityChange(e.target.value)}
                       className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-xs font-medium text-slate-800 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/15"
@@ -2587,10 +2294,12 @@ function PropertiesClientContent() {
                   </div>
 
                   <div className="relative">
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                    <label id="filter-field-2-label" htmlFor="filter-field-2" className="mb-1.5 block text-xs font-semibold text-slate-700">
                       Micromarket
                     </label>
                     <button
+                      id="filter-field-2"
+                      aria-labelledby="filter-field-2-label filter-field-2"
                       type="button"
                       disabled={!resolvedCity || micromarketsLoading}
                       onClick={() => setShowMicromarkets(!showMicromarkets)}
@@ -2676,11 +2385,12 @@ function PropertiesClientContent() {
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                    <label htmlFor="filter-field-3" className="mb-1.5 block text-xs font-semibold text-slate-700">
                       Office Type
                     </label>
                     <div className="relative">
                     <select
+                      id="filter-field-3"
                       value={filters.type === "ai" ? "" : filters.type}
                       onChange={(e) => updateFilter("type", e.target.value)}
                       className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-xs font-medium text-slate-800 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/15"
@@ -2699,12 +2409,13 @@ function PropertiesClientContent() {
                   {isCoworking ? (
                     <>
                       <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                        <label htmlFor="filter-field-4" className="mb-1.5 block text-xs font-semibold text-slate-700">
                           Required Seats
                         </label>
                         <div className="relative">
                           <Users className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                           <FilterNumberInput
+                      id="filter-field-4"
                             value={filters.seats}
                             onCommit={(nextValue) =>
                               updateFilter("seats", nextValue)
@@ -2715,7 +2426,7 @@ function PropertiesClientContent() {
                         </div>
                       </div>
                       <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                        <label htmlFor="filter-field-5" className="mb-1.5 block text-xs font-semibold text-slate-700">
                           Max Seat Price / month ({filters.currency})
                         </label>
                         <div className="relative">
@@ -2723,6 +2434,7 @@ function PropertiesClientContent() {
                             {renderCurrencyIcon()}
                           </span>
                           <FilterNumberInput
+                      id="filter-field-5"
                             value={filters.maxBudget}
                             onCommit={(nextValue) =>
                               updateFilter("maxBudget", nextValue)
@@ -2736,7 +2448,7 @@ function PropertiesClientContent() {
                   ) : (
                     <>
                       <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                        <label htmlFor="filter-field-6" className="mb-1.5 block text-xs font-semibold text-slate-700">
                           Max Rent / {areaUnitLabel} / month ({filters.currency})
                         </label>
                         <div className="relative">
@@ -2744,6 +2456,7 @@ function PropertiesClientContent() {
                             {renderCurrencyIcon()}
                           </span>
                           <FilterNumberInput
+                      id="filter-field-6"
                             value={filters.maxBudget}
                             onCommit={(nextValue) =>
                               updateFilter("maxBudget", nextValue)
@@ -2754,12 +2467,13 @@ function PropertiesClientContent() {
                         </div>
                       </div>
                       <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                        <label htmlFor="filter-field-7" className="mb-1.5 block text-xs font-semibold text-slate-700">
                           Min Area ({areaUnitLabel})
                         </label>
                         <div className="relative">
                           <Maximize2 className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                           <FilterNumberInput
+                      id="filter-field-7"
                             value={filters.area}
                             onCommit={(nextValue) =>
                               updateFilter("area", nextValue)
@@ -2996,7 +2710,7 @@ function PropertiesClientContent() {
             Loading more properties…
           </p>
         )}
-      </main>
+      </div>
 
       {/* Floating card: fixed in the corner, so it takes no space on the
           page and scrolling works as usual. Sits above the compare bar. */}
@@ -3013,7 +2727,7 @@ function PropertiesClientContent() {
                 type="button"
                 onClick={() => setExclusiveCardOpen(false)}
                 aria-label="Minimise"
-                className="absolute right-2 top-2 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -3037,6 +2751,7 @@ function PropertiesClientContent() {
                 onClick={() => {
                   setExclusiveLeadError("");
                   setExclusiveLeadSuccess(false);
+                  exclusiveGuard.restart();
                   setIsExclusiveLeadOpen(true);
                 }}
                 className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#A054A0] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#864286] focus:outline-none focus:ring-2 focus:ring-[#A054A0]/40 focus:ring-offset-2"
@@ -3155,608 +2870,51 @@ function PropertiesClientContent() {
 
       {/* Enquiry Modal */}
       {isEnquiryOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-md transition-all duration-300"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeEnquiryForm();
-            }
-          }}
-        >
-          <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-100 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#A054A0]/10 text-[#A054A0]">
-                  <MessageSquare className="h-5 w-5" />
-                </div>
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#A054A0]">
-                    Property Enquiry
-                  </span>
-                  <h2 className="text-xl font-bold text-slate-900">
-                    Fill your Contact Details to Raise an Enquiry
-
-                  </h2>
-                </div>
-              </div>
-
-
-              <button
-                type="button"
-                onClick={closeEnquiryForm}
-                disabled={isSubmittingEnquiry}
-                aria-label="Close form"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-800 disabled:opacity-50"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-6">
-              {enquirySuccess ? (
-                <div className="flex min-h-[360px] flex-col items-center justify-center text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                    <CheckCircle2 className="h-9 w-9" />
-                  </div>
-
-                  <h3 className="mt-5 text-2xl font-bold text-slate-900">
-                    Enquiry Submitted Successfully!
-                  </h3>
-
-                  <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-                    Thank you for reaching out. Our real estate specialist has
-                    received your requirements for the selected properties and
-                    will get in touch shortly.
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={closeEnquiryForm}
-                    className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#A054A0] px-8 py-2.5 text-sm font-semibold text-white shadow-md shadow-[#A054A0]/20 transition hover:bg-[#864286]"
-                  >
-                    Done
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleEnquirySubmit} className="space-y-6">
-                  <div className="rounded-xl border border-slate-800/25 bg-slate-50/70 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-[#A054A0]" />
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Selected Properties
-                        </span>
-                      </div>
-                      <span className="rounded-full bg-[#A054A0] px-2.5 py-0.5 text-xs font-bold text-white shadow-xs">
-                        {enquirySelection.length}{" "}
-                        {enquirySelection.length === 1
-                          ? "Property"
-                          : "Properties"}
-                      </span>
-                    </div>
-
-                    <div className="custom-scrollbar flex gap-3 overflow-x-auto pb-1 pt-1">
-                      {enquirySelection.map((property, index) => {
-                        const propertyId = getPropertyId(property);
-                        const propertySlug = getPropertySlug(property);
-
-                        const propertyUrl = propertySlug
-                          ? `/properties/${propertyId}/${propertySlug}`
-                          : `/properties/${propertyId}`;
-
-                        const propertyName =
-                          property?.name ?? "Selected Property";
-                        const city = property?.city ?? "";
-                        const micromarket = property?.micromarket ?? "";
-                        const coverImage = getPropertyImageUrl(property);
-
-                        return (
-                          <div
-                            key={`${propertyId}-${index}`}
-                            className="group relative flex min-w-[240px] max-w-[280px] shrink-0 items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs transition hover:border-[#A054A0] hover:shadow-md"
-                          >
-                            <Link
-                              href={propertyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex min-w-0 flex-1 items-center gap-3"
-                              title={`View details for ${propertyName}`}
-                            >
-                              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                                {coverImage ? (
-                                  <Image
-                                    src={coverImage}
-                                    alt={propertyName}
-                                    fill
-                                    className="object-cover transition-transform duration-300 group-hover:scale-110"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-[#A054A0]/60">
-                                    <Building className="h-5 w-5" />
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1">
-                                  <p className="truncate text-xs font-bold text-slate-900 transition-colors group-hover:text-[#A054A0]">
-                                    {propertyName}
-                                  </p>
-                                  <ExternalLink className="h-3 w-3 shrink-0 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" />
-                                </div>
-
-                                {(city || micromarket) && (
-                                  <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-slate-500">
-                                    <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
-                                    <span className="truncate">
-                                      {[micromarket, city]
-                                        .filter(Boolean)
-                                        .join(", ")}
-                                    </span>
-                                  </p>
-                                )}
-                              </div>
-                            </Link>
-
-                            {enquirySelection.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleRemoveFromEnquiry(propertyId);
-                                }}
-                                title="Remove from enquiry"
-                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-500"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Your Contact Information
-                    </p>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Full Name <span className="text-red-500">*</span>
-                        </span>
-                        <div className="relative">
-                          <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            required
-                            name="fullName"
-                            value={enquiryForm.fullName}
-                            onChange={handleEnquiryChange}
-                            autoComplete="name"
-                            placeholder="John Doe"
-                            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/20"
-                          />
-                        </div>
-                      </label>
-
-                      <label className="block">
-                        <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Phone Number <span className="text-red-500">*</span>
-                        </span>
-                        <div className="relative">
-                          <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            required
-                            type="tel"
-                            name="phone"
-                            value={enquiryForm.phone}
-                            onChange={handleEnquiryChange}
-                            autoComplete="tel"
-                            placeholder="+91 98765 43210"
-                            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/20"
-                          />
-                        </div>
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Company Name
-                        </span>
-                        <div className="relative">
-                          <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            name="company"
-                            value={enquiryForm.company}
-                            onChange={handleEnquiryChange}
-                            autoComplete="organization"
-                            placeholder="Your company name"
-                            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/20"
-                          />
-                        </div>
-                      </label>
-
-                      <label className="block">
-                        <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Email Address
-                        </span>
-                        <div className="relative">
-                          <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            type="email"
-                            name="email"
-                            value={enquiryForm.email}
-                            onChange={handleEnquiryChange}
-                            autoComplete="email"
-                            placeholder="john@example.com"
-                            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/20"
-                          />
-                        </div>
-                      </label>
-                    </div>
-
-                    <label className="block">
-                      <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-                        Message
-                      </span>
-                      <textarea
-                        name="message"
-                        value={enquiryForm.message}
-                        onChange={handleEnquiryChange}
-                        rows={3}
-                        placeholder="Tell us about your requirement..."
-                        className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3.5 text-sm text-slate-900 outline-none transition focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/20"
-                      />
-                    </label>
-                  </div>
-
-                  {enquiryError && (
-                    <div
-                      role="alert"
-                      className="rounded-xl border border-red-200 bg-red-50/80 p-3.5 text-xs font-medium text-red-700"
-                    >
-                      {enquiryError}
-                    </div>
-                  )}
-
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={isSubmittingEnquiry}
-                      className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#A054A0] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#A054A0]/25 transition hover:bg-[#864286] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A054A0] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isSubmittingEnquiry ? (
-                        <>
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          Submitting Enquiry...
-                        </>
-                      ) : (
-                        <>
-                          Submit Enquiry
-                          <ArrowRight className="h-4 w-4" />
-                        </>
-                      )}
-                    </button>
-
-                    <p className="mt-3 text-center text-[11px] text-slate-400">
-                      By submitting, you agree to be contacted by our advisors
-                      regarding your selected property shortlist.
-                    </p>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
+        <EnquiryModal
+          closeEnquiryForm={closeEnquiryForm}
+          enquiryError={enquiryError}
+          enquiryForm={enquiryForm}
+          enquiryGuard={enquiryGuard}
+          enquirySelection={enquirySelection}
+          enquirySuccess={enquirySuccess}
+          handleEnquiryChange={handleEnquiryChange}
+          handleEnquirySubmit={handleEnquirySubmit}
+          handleRemoveFromEnquiry={handleRemoveFromEnquiry}
+          isSubmittingEnquiry={isSubmittingEnquiry}
+        />
       )}
 
       {isExclusiveLeadOpen && (
-        <div
-          className="fixed inset-0 z-[250] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeExclusiveLeadForm();
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="exclusive-lead-title"
-            className="my-auto w-full max-w-md overflow-visible rounded-xl bg-white shadow-2xl sm:max-w-[38rem]"
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
-              <div>
-                <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-semibold text-[#A054A0]">
-                  <Sparkles className="h-3 w-3" />
-                  Exclusive Property Assistance
-                </div>
-
-                <h2
-                  id="exclusive-lead-title"
-                  className="text-base font-bold text-slate-900 sm:text-lg"
-                >
-                  Find your ideal office space
-                </h2>
-
-                <p className="mt-1 text-xs leading-5 text-slate-500 sm:whitespace-nowrap">
-                  Share your contact details and our team will help
-                  you explore more options.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeExclusiveLeadForm}
-                disabled={isSubmittingExclusiveLead}
-                aria-label="Close exclusive properties form"
-                className="shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="px-4 py-4 sm:px-5">
-              {exclusiveLeadSuccess ? (
-                <div className="py-7 text-center">
-                  <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-500" />
-
-                  <h3 className="mt-4 text-lg font-bold text-slate-900">
-                    Thank you for reaching out!
-                  </h3>
-
-                  <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                    Your request has been received. Our team will
-                    connect with you about suitable office spaces.
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={closeExclusiveLeadForm}
-                    className="mt-6 rounded-xl bg-[#A054A0] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#864286]"
-                  >
-                    Continue Exploring
-                  </button>
-                </div>
-              ) : (
-                <form
-                  noValidate
-                  onSubmit={handleExclusiveLeadSubmit}
-                  className="space-y-3"
-                >
-                  <div>
-                    <label
-                      htmlFor="exclusive-name"
-                      className="mb-1 block text-xs font-medium text-slate-700"
-                    >
-                      Full Name <span className="text-red-500">*</span>
-                    </label>
-
-                    <input
-                      id="exclusive-name"
-                      name="name"
-                      type="text"
-                      autoComplete="name"
-                      required
-                      maxLength={160}
-                      value={exclusiveLeadForm.name}
-                      onChange={handleExclusiveLeadChange}
-                      placeholder="Enter your full name"
-                      aria-invalid={Boolean(exclusiveFieldErrors.name)}
-                      className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10 ${exclusiveFieldErrors.name ? "border-red-400" : "border-slate-200"}`}
-                    />
-                    {exclusiveFieldErrors.name && (
-                      <p className="mt-1 text-xs text-red-600">{exclusiveFieldErrors.name}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="exclusive-phone"
-                      className="mb-1 block text-xs font-medium text-slate-700"
-                    >
-                      Phone Number <span className="text-red-500">*</span>
-                    </label>
-
-                    <div ref={exclusiveCountryRef} className="relative">
-                      <div
-                        className={`flex overflow-hidden rounded-lg border transition focus-within:border-[#A054A0] focus-within:ring-2 focus-within:ring-[#A054A0]/10 ${exclusiveFieldErrors.phone ? "border-red-400" : "border-slate-200"}`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setExclusiveCountryOpen((open) => !open)}
-                          aria-haspopup="listbox"
-                          aria-expanded={exclusiveCountryOpen}
-                          aria-label={`Country code ${exclusiveCountry.name} ${exclusiveCountry.dial}`}
-                          className="flex shrink-0 items-center gap-1 border-r border-slate-200 bg-slate-50 px-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                        >
-                          <span className="text-[11px] font-semibold text-slate-500">
-                            {exclusiveCountry.code}
-                          </span>
-                          {exclusiveCountry.dial}
-                          <ChevronDown
-                            className={`h-3.5 w-3.5 transition-transform ${exclusiveCountryOpen ? "rotate-180 text-[#A054A0]" : ""}`}
-                          />
-                        </button>
-                        <input
-                          id="exclusive-phone"
-                          name="phone"
-                          type="tel"
-                          autoComplete="tel-national"
-                          inputMode="numeric"
-                          required
-                          value={exclusiveLeadForm.phone}
-                          onChange={handleExclusiveLeadChange}
-                          placeholder="Enter your phone number"
-                          aria-invalid={Boolean(exclusiveFieldErrors.phone)}
-                          className="min-w-0 flex-1 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                        />
-                      </div>
-
-                      {exclusiveCountryOpen && (
-                        <div className="absolute left-0 top-[calc(100%+6px)] z-10 w-[280px] max-w-[calc(100vw-3rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                          <div className="border-b border-slate-100 p-2">
-                            <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5">
-                              <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                              <input
-                                type="text"
-                                value={exclusiveCountrySearch}
-                                onChange={(e) => setExclusiveCountrySearch(e.target.value)}
-                                placeholder="Search country or code..."
-                                autoFocus
-                                className="h-8 min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                              />
-                            </div>
-                          </div>
-                          <div role="listbox" className="max-h-[200px] overflow-y-auto overscroll-contain p-1">
-                            {filteredExclusiveCountries.length > 0 ? (
-                              filteredExclusiveCountries.map((country) => {
-                                const selected =
-                                  country.code === exclusiveCountry.code &&
-                                  country.dial === exclusiveCountry.dial;
-                                return (
-                                  <button
-                                    key={`${country.code}-${country.dial}`}
-                                    type="button"
-                                    role="option"
-                                    aria-selected={selected}
-                                    onClick={() => {
-                                      setExclusiveCountry(country);
-                                      setExclusiveCountryOpen(false);
-                                      setExclusiveCountrySearch("");
-                                      setExclusiveLeadForm((prev) => ({
-                                        ...prev,
-                                        phone: prev.phone.replace(/\D/g, "").slice(0, country.max),
-                                      }));
-                                      setExclusiveFieldErrors((prev) => ({ ...prev, phone: "" }));
-                                    }}
-                                    className={`flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm transition ${selected
-                                      ? "bg-[#A054A0] font-semibold text-white"
-                                      : "text-slate-800 hover:bg-[#A054A0]/10 hover:text-[#A054A0]"
-                                      }`}
-                                  >
-                                    <span className="flex min-w-0 items-center gap-2">
-                                      <span className="w-6 shrink-0 text-[11px] font-semibold opacity-70">
-                                        {country.code}
-                                      </span>
-                                      <span className="truncate">{country.name}</span>
-                                    </span>
-                                    <span className="flex shrink-0 items-center gap-1.5 text-xs">
-                                      {country.dial}
-                                      {selected && <Check className="h-3.5 w-3.5" />}
-                                    </span>
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <p className="px-3 py-5 text-center text-sm text-slate-500">
-                                No country found
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {exclusiveFieldErrors.phone && (
-                      <p className="mt-1 text-xs text-red-600">{exclusiveFieldErrors.phone}</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="exclusive-email"
-                      className="mb-1 block text-xs font-medium text-slate-700"
-                    >
-                      Email Address
-                    </label>
-
-                    <input
-                      id="exclusive-email"
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      maxLength={254}
-                      value={exclusiveLeadForm.email}
-                      onChange={handleExclusiveLeadChange}
-                      placeholder="you@company.com"
-                      aria-invalid={Boolean(exclusiveFieldErrors.email)}
-                      className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10 ${exclusiveFieldErrors.email ? "border-red-400" : "border-slate-200"}`}
-                    />
-                    {exclusiveFieldErrors.email && (
-                      <p className="mt-1 text-xs text-red-600">{exclusiveFieldErrors.email}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="exclusive-company"
-                      className="mb-1 block text-xs font-medium text-slate-700"
-                    >
-                      Company Name
-                    </label>
-
-                    <input
-                      id="exclusive-company"
-                      name="company"
-                      type="text"
-                      autoComplete="organization"
-                      maxLength={150}
-                      value={exclusiveLeadForm.company}
-                      onChange={handleExclusiveLeadChange}
-                      placeholder="Enter your company name"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10"
-                    />
-                  </div>
-                  </div>
-
-                  {exclusiveLeadError && (
-                    <div
-                      role="alert"
-                      className="rounded-lg border border-red-100 bg-red-50 p-2.5 text-xs text-red-700"
-                    >
-                      {exclusiveLeadError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={isSubmittingExclusiveLead}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#A054A0] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#864286] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSubmittingExclusiveLead ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Submitting Request...
-                      </>
-                    ) : (
-                      <>
-                        Connect with our team
-                        <ArrowRight className="h-4 w-4" />
-                      </>
-                    )}
-                  </button>
-
-                  <p className="text-center text-[11px] leading-4 text-slate-400">
-                    Your details will be used to respond to your property
-                    enquiry.
-                  </p>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
+        <ExclusiveLeadModal
+          closeExclusiveLeadForm={closeExclusiveLeadForm}
+          exclusiveCountry={exclusiveCountry}
+          exclusiveCountryOpen={exclusiveCountryOpen}
+          exclusiveCountryRef={exclusiveCountryRef}
+          exclusiveCountrySearch={exclusiveCountrySearch}
+          exclusiveFieldErrors={exclusiveFieldErrors}
+          exclusiveGuard={exclusiveGuard}
+          exclusiveLeadError={exclusiveLeadError}
+          exclusiveLeadForm={exclusiveLeadForm}
+          exclusiveLeadSuccess={exclusiveLeadSuccess}
+          filteredExclusiveCountries={filteredExclusiveCountries}
+          handleExclusiveLeadChange={handleExclusiveLeadChange}
+          handleExclusiveLeadSubmit={handleExclusiveLeadSubmit}
+          isSubmittingExclusiveLead={isSubmittingExclusiveLead}
+          setExclusiveCountry={setExclusiveCountry}
+          setExclusiveCountryOpen={setExclusiveCountryOpen}
+          setExclusiveCountrySearch={setExclusiveCountrySearch}
+          setExclusiveFieldErrors={setExclusiveFieldErrors}
+          setExclusiveLeadForm={setExclusiveLeadForm}
+        />
       )}
     </div>
   );
 }
 
-export default function PropertiesClient() {
+export default function PropertiesClient({ initialResults = null }) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
-      <PropertiesClientContent />
+      <PropertiesClientContent initialResults={initialResults} />
     </Suspense>
   );
 }

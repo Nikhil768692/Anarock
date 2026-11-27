@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export async function GET(request) {
@@ -22,7 +23,7 @@ export async function GET(request) {
       count: items.length,
     });
   } catch (error) {
-    console.error("Wishlist GET Error:", error);
+    logger.error("Wishlist GET Error:", error);
     return NextResponse.json(
       {
         success: false,

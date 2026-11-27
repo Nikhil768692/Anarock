@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getKycTable } from "@/lib/catalyst";
 import { getOrFetchCache } from "@/lib/cache";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,7 +95,7 @@ export async function GET() {
       },
     );
   } catch (error) {
-    console.error("[FAQ API] Failed:", {
+    logger.error("[FAQ API] Failed:", {
       message: error?.message,
       status: error?.status,
       code: error?.code,

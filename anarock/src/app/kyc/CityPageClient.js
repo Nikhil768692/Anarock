@@ -2,10 +2,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import PrivacyNotice from "@/components/common/PrivacyNotice";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PropertyCard from "@/components/properties/PropertyCard";
 import { usePreferences } from "@/lib/preferences";
 import { convertArea, convertCurrency } from "@/lib/format";
+import {
+  SECURITY_CHECK_MESSAGE,
+  useFormGuard,
+} from "@/components/common/FormGuard";
 import {
   ArrowRight,
   Building2,
@@ -16,6 +21,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { PHONE_COUNTRIES } from "@/lib/phoneCountries";
 
 const COMPARE_STORAGE_KEY = "anarock_compare_properties";
 const MAX_COMPARE_PROPERTIES = 3;
@@ -414,9 +420,25 @@ export default function CityPageClient({ city }) {
   const countLabel = loadingProperties
     ? "…"
     : totalProperties.toLocaleString("en-IN");
+  // With no listings the count is not shown, so the page does not promise
+  // buildings it cannot list.
+  const noListings = !loadingProperties && !propertyError && totalProperties === 0;
+  const heroText = noListings ? (
+    <>
+      Our advisors source office space across {city}’s key micro-markets on
+      request, backed by rental data from Anarock Research. Share your
+      requirement to get a shortlist.
+    </>
+  ) : (
+    <>
+      {countLabel} verified Grade A buildings across {city}’s key
+      micro-markets, with live rentals from Anarock Research and
+      advisors who close deals here every week.
+    </>
+  );
 
   return (
-    <main className="w-full min-w-0 bg-[#F6F6F8] text-black">
+    <div className="w-full min-w-0 bg-[#F6F6F8] text-black">
       <Breadcrumbs
         items={[
           { label: "Popular Cities", href: "/#popularCities" },
@@ -442,19 +464,11 @@ export default function CityPageClient({ city }) {
             <p className="mt-5 max-w-[560px] text-[15px] leading-7 text-black/75 sm:text-base">
               {loadingCityData ? (
                 // Keeps the space while the text loads, so nothing jumps.
-                <span className="invisible">
-                  {countLabel} verified Grade A buildings across {city}’s key
-                  micro-markets, with live rentals from Anarock Research and
-                  advisors who close deals here every week.
-                </span>
+                <span className="invisible">{heroText}</span>
               ) : cityData.heroDescription ? (
                 cityData.heroDescription
               ) : (
-                <>
-                  {countLabel} verified Grade A buildings across {city}’s key
-                  micro-markets, with live rentals from Anarock Research and
-                  advisors who close deals here every week.
-                </>
+                heroText
               )}
             </p>
           </div>
@@ -559,7 +573,9 @@ export default function CityPageClient({ city }) {
       {/* OFFICE SPACES */}
       <section className="mx-auto w-full max-w-[1280px] px-4 pt-12 sm:px-6 sm:pt-14 lg:px-10 lg:pt-16">
         <h2 className="text-[24px] font-bold tracking-[-0.01em] text-black sm:text-[28px]">
-          {countLabel} office spaces available
+          {noListings
+            ? `Office spaces in ${city}`
+            : `${countLabel} office spaces available`}
         </h2>
 
         <div className="mt-6">
@@ -659,7 +675,7 @@ export default function CityPageClient({ city }) {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 
@@ -863,48 +879,6 @@ function PropertyGridItem({ property, isCompared, onCompareToggle }) {
 }
 
 // Same country list as the home page requirement form.
-const PHONE_COUNTRIES = [
-  { name: "India", code: "IN", dial: "+91", flag: "🇮🇳", min: 10, max: 10 },
-  { name: "United States", code: "US", dial: "+1", flag: "🇺🇸", min: 10, max: 10 },
-  { name: "Canada", code: "CA", dial: "+1", flag: "🇨🇦", min: 10, max: 10 },
-  { name: "United Kingdom", code: "GB", dial: "+44", flag: "🇬🇧", min: 10, max: 10 },
-  { name: "United Arab Emirates", code: "AE", dial: "+971", flag: "🇦🇪", min: 9, max: 9 },
-  { name: "Australia", code: "AU", dial: "+61", flag: "🇦🇺", min: 9, max: 9 },
-  { name: "Singapore", code: "SG", dial: "+65", flag: "🇸🇬", min: 8, max: 8 },
-  { name: "Germany", code: "DE", dial: "+49", flag: "🇩🇪", min: 10, max: 11 },
-  { name: "France", code: "FR", dial: "+33", flag: "🇫🇷", min: 9, max: 9 },
-  { name: "Italy", code: "IT", dial: "+39", flag: "🇮🇹", min: 9, max: 10 },
-  { name: "Spain", code: "ES", dial: "+34", flag: "🇪🇸", min: 9, max: 9 },
-  { name: "Netherlands", code: "NL", dial: "+31", flag: "🇳🇱", min: 9, max: 9 },
-  { name: "Switzerland", code: "CH", dial: "+41", flag: "🇨🇭", min: 9, max: 9 },
-  { name: "Ireland", code: "IE", dial: "+353", flag: "🇮🇪", min: 9, max: 9 },
-  { name: "New Zealand", code: "NZ", dial: "+64", flag: "🇳🇿", min: 8, max: 10 },
-  { name: "Japan", code: "JP", dial: "+81", flag: "🇯🇵", min: 10, max: 10 },
-  { name: "South Korea", code: "KR", dial: "+82", flag: "🇰🇷", min: 9, max: 10 },
-  { name: "China", code: "CN", dial: "+86", flag: "🇨🇳", min: 11, max: 11 },
-  { name: "Hong Kong", code: "HK", dial: "+852", flag: "🇭🇰", min: 8, max: 8 },
-  { name: "Malaysia", code: "MY", dial: "+60", flag: "🇲🇾", min: 9, max: 10 },
-  { name: "Thailand", code: "TH", dial: "+66", flag: "🇹🇭", min: 9, max: 9 },
-  { name: "Israel", code: "IL", dial: "+972", flag: "🇮🇱", min: 9, max: 9 },
-  { name: "Indonesia", code: "ID", dial: "+62", flag: "🇮🇩", min: 9, max: 12 },
-  { name: "Philippines", code: "PH", dial: "+63", flag: "🇵🇭", min: 10, max: 10 },
-  { name: "Vietnam", code: "VN", dial: "+84", flag: "🇻🇳", min: 9, max: 10 },
-  { name: "South Africa", code: "ZA", dial: "+27", flag: "🇿🇦", min: 9, max: 9 },
-  { name: "Saudi Arabia", code: "SA", dial: "+966", flag: "🇸🇦", min: 9, max: 9 },
-  { name: "Qatar", code: "QA", dial: "+974", flag: "🇶🇦", min: 8, max: 8 },
-  { name: "Kuwait", code: "KW", dial: "+965", flag: "🇰🇼", min: 8, max: 8 },
-  { name: "Oman", code: "OM", dial: "+968", flag: "🇴🇲", min: 8, max: 8 },
-  { name: "Bahrain", code: "BH", dial: "+973", flag: "🇧🇭", min: 8, max: 8 },
-  { name: "Pakistan", code: "PK", dial: "+92", flag: "🇵🇰", min: 10, max: 10 },
-  { name: "Bangladesh", code: "BD", dial: "+880", flag: "🇧🇩", min: 10, max: 10 },
-  { name: "Nepal", code: "NP", dial: "+977", flag: "🇳🇵", min: 10, max: 10 },
-  { name: "Sri Lanka", code: "LK", dial: "+94", flag: "🇱🇰", min: 9, max: 9 },
-  { name: "Russia", code: "RU", dial: "+7", flag: "🇷🇺", min: 10, max: 10 },
-  { name: "Brazil", code: "BR", dial: "+55", flag: "🇧🇷", min: 10, max: 11 },
-  { name: "Mexico", code: "MX", dial: "+52", flag: "🇲🇽", min: 10, max: 10 },
-  { name: "Argentina", code: "AR", dial: "+54", flag: "🇦🇷", min: 10, max: 11 },
-  { name: "Turkey", code: "TR", dial: "+90", flag: "🇹🇷", min: 10, max: 10 },
-];
 
 const EMPTY_FORM = {
   name: "",
@@ -960,6 +934,7 @@ function RequirementForm({ city, micromarkets, unit }) {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
+  const guard = useFormGuard();
 
   const updateField = (field, value) => {
     setForm((previous) => ({ ...previous, [field]: value }));
@@ -999,6 +974,11 @@ function RequirementForm({ city, micromarkets, unit }) {
     event.preventDefault();
     if (submitting || !validate()) return;
 
+    if (!guard.ready) {
+      setStatus({ type: "error", message: SECURITY_CHECK_MESSAGE });
+      return;
+    }
+
     setSubmitting(true);
     setStatus({ type: "", message: "" });
 
@@ -1027,6 +1007,7 @@ function RequirementForm({ city, micromarkets, unit }) {
           Province: location.state || "",
           Postal_Code: location.pincode || "",
           Country: location.country || "",
+          ...guard.values(),
         }),
       });
       const result = await response.json().catch(() => ({}));
@@ -1053,6 +1034,7 @@ function RequirementForm({ city, micromarkets, unit }) {
           "We couldn't submit your requirement right now. Please try again.",
       });
     } finally {
+      guard.afterSubmit();
       setSubmitting(false);
     }
   };
@@ -1286,6 +1268,10 @@ function RequirementForm({ city, micromarkets, unit }) {
           */}
         </div>
 
+        {guard.fields}
+
+        <PrivacyNotice className="mt-4" />
+
         <button
           type="submit"
           disabled={submitting}
@@ -1348,12 +1334,18 @@ function EmptyProperties({ city }) {
         <Building2 size={25} strokeWidth={1.7} className="text-[#A054A0]" />
       </div>
       <h3 className="mt-5 text-lg font-semibold tracking-tight text-black">
-        No properties found
+        No spaces listed online yet
       </h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-black/75">
-        There are currently no properties available in {city}. Please check
-        back later for new listings.
+        Our {city} advisors can still find options for you, including spaces
+        that are not listed online.
       </p>
+      <a
+        href="#city-requirement"
+        className="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#7B2F77] px-6 text-sm font-semibold text-white transition hover:opacity-90"
+      >
+        Share your requirement
+      </a>
     </div>
   );
 }

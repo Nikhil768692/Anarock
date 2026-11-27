@@ -1,4 +1,5 @@
 import { getAllProperties } from "@/lib/propertiesCache";
+import { logger } from "@/lib/logger";
 const SITE_URL = (process.env.NEXT_PUBLIC_BASE_URL || "https://anarock.com").replace(/\/+$/, "");
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,11 @@ export default async function sitemap() {
       changeFrequency: "daily",
       priority: 0.9,
     },
+    {
+      url: `${SITE_URL}/contact`,
+      changeFrequency: "yearly",
+      priority: 0.5,
+    },
   ];
 
   const cityPages = cities.map((city) => ({
@@ -71,7 +77,7 @@ export default async function sitemap() {
     })
       .filter(Boolean);
   } catch (error) {
-    console.error(
+    logger.error(
       "[Sitemap] Unable to load property URLs:",
       error?.message || error,
     );

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getZohoAccessToken, zohoFetch } from "@/lib/zoho";
 import { getOrFetchCache } from "@/lib/cache";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ async function fetchCities() {
   const response = await zohoFetch(url, { method: "GET" });
 
   if (!response.ok) {
-    console.error("[Cities API] Zoho request failed:", {
+    logger.error("[Cities API] Zoho request failed:", {
       status: response.status,
     });
 
@@ -70,7 +71,7 @@ export async function GET() {
       },
     );
   } catch (error) {
-    console.error("[Cities API] Failed:", {
+    logger.error("[Cities API] Failed:", {
       code: error?.message || "UNKNOWN_ERROR",
       status: error?.status || null,
     });

@@ -2,6 +2,11 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CookieConsent from "@/components/common/CookieConsent";
+import PrivacyNotice from "@/components/common/PrivacyNotice";
+import {
+  SECURITY_CHECK_MESSAGE,
+  useFormGuard,
+} from "@/components/common/FormGuard";
 import HeroSection from "@/components/home/HeroSection";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -21,49 +26,8 @@ import {
   CheckCircle2,
   ChevronDown,
 } from "lucide-react";
+import { PHONE_COUNTRIES as phoneCountries } from "@/lib/phoneCountries";
 
-const phoneCountries = [
-  { name: "India", code: "IN", dial: "+91", flag: "🇮🇳", min: 10, max: 10 },
-  { name: "United States", code: "US", dial: "+1", flag: "🇺🇸", min: 10, max: 10 },
-  { name: "Canada", code: "CA", dial: "+1", flag: "🇨🇦", min: 10, max: 10 },
-  { name: "United Kingdom", code: "GB", dial: "+44", flag: "🇬🇧", min: 10, max: 10 },
-  { name: "United Arab Emirates", code: "AE", dial: "+971", flag: "🇦🇪", min: 9, max: 9 },
-  { name: "Australia", code: "AU", dial: "+61", flag: "🇦🇺", min: 9, max: 9 },
-  { name: "Singapore", code: "SG", dial: "+65", flag: "🇸🇬", min: 8, max: 8 },
-  { name: "Germany", code: "DE", dial: "+49", flag: "🇩🇪", min: 10, max: 11 },
-  { name: "France", code: "FR", dial: "+33", flag: "🇫🇷", min: 9, max: 9 },
-  { name: "Italy", code: "IT", dial: "+39", flag: "🇮🇹", min: 9, max: 10 },
-  { name: "Spain", code: "ES", dial: "+34", flag: "🇪🇸", min: 9, max: 9 },
-  { name: "Netherlands", code: "NL", dial: "+31", flag: "🇳🇱", min: 9, max: 9 },
-  { name: "Switzerland", code: "CH", dial: "+41", flag: "🇨🇭", min: 9, max: 9 },
-  { name: "Ireland", code: "IE", dial: "+353", flag: "🇮🇪", min: 9, max: 9 },
-  { name: "New Zealand", code: "NZ", dial: "+64", flag: "🇳🇿", min: 8, max: 10 },
-  { name: "Japan", code: "JP", dial: "+81", flag: "🇯🇵", min: 10, max: 10 },
-  { name: "South Korea", code: "KR", dial: "+82", flag: "🇰🇷", min: 9, max: 10 },
-  { name: "China", code: "CN", dial: "+86", flag: "🇨🇳", min: 11, max: 11 },
-  { name: "Hong Kong", code: "HK", dial: "+852", flag: "🇭🇰", min: 8, max: 8 },
-  { name: "Malaysia", code: "MY", dial: "+60", flag: "🇲🇾", min: 9, max: 10 },
-  { name: "Thailand", code: "TH", dial: "+66", flag: "🇹🇭", min: 9, max: 9 },
-  { name: "Israel", code: "IL", dial: "+972", flag: "🇮🇱", min: 9, max: 9 },
-  { name: "Indonesia", code: "ID", dial: "+62", flag: "🇮🇩", min: 9, max: 12 },
-  { name: "Philippines", code: "PH", dial: "+63", flag: "🇵🇭", min: 10, max: 10 },
-  { name: "Vietnam", code: "VN", dial: "+84", flag: "🇻🇳", min: 9, max: 10 },
-  { name: "South Africa", code: "ZA", dial: "+27", flag: "🇿🇦", min: 9, max: 9 },
-  { name: "Saudi Arabia", code: "SA", dial: "+966", flag: "🇸🇦", min: 9, max: 9 },
-  { name: "Qatar", code: "QA", dial: "+974", flag: "🇶🇦", min: 8, max: 8 },
-  { name: "Kuwait", code: "KW", dial: "+965", flag: "🇰🇼", min: 8, max: 8 },
-  { name: "Oman", code: "OM", dial: "+968", flag: "🇴🇲", min: 8, max: 8 },
-  { name: "Bahrain", code: "BH", dial: "+973", flag: "🇧🇭", min: 8, max: 8 },
-  { name: "Pakistan", code: "PK", dial: "+92", flag: "🇵🇰", min: 10, max: 10 },
-  { name: "Bangladesh", code: "BD", dial: "+880", flag: "🇧🇩", min: 10, max: 10 },
-  { name: "Nepal", code: "NP", dial: "+977", flag: "🇳🇵", min: 10, max: 10 },
-  { name: "Sri Lanka", code: "LK", dial: "+94", flag: "🇱🇰", min: 9, max: 9 },
-  { name: "Russia", code: "RU", dial: "+7", flag: "🇷🇺", min: 10, max: 10 },
-  { name: "Brazil", code: "BR", dial: "+55", flag: "🇧🇷", min: 10, max: 11 },
-  { name: "Mexico", code: "MX", dial: "+52", flag: "🇲🇽", min: 10, max: 10 },
-  { name: "Argentina", code: "AR", dial: "+54", flag: "🇦🇷", min: 10, max: 11 },
-  { name: "Turkey", code: "TR", dial: "+90", flag: "🇹🇷", min: 10, max: 10 },
-];
 
 const popularCities = [
   {
@@ -517,6 +481,7 @@ export default function HomePage() {
   const [countryOpen, setCountryOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const requirementGuard = useFormGuard();
   const countrySearchRef = useRef(null);
   const [requirementCity, setRequirementCity] = useState("");
   const [requirementType, setRequirementType] = useState("");
@@ -591,6 +556,11 @@ export default function HomePage() {
     e.preventDefault();
     const isPhoneValid = validatePhone(phone, selectedCountry);
     if (!isPhoneValid) return;
+    if (!requirementGuard.ready) {
+      setSubmitMessage(SECURITY_CHECK_MESSAGE);
+      setSubmitMessageType("error");
+      return;
+    }
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
@@ -638,6 +608,7 @@ export default function HomePage() {
     const payload = {
       ...crmData,
       fullPhone: `${selectedCountry.dial}${phone}`,
+      ...requirementGuard.values(),
     };
 
     try {
@@ -668,6 +639,7 @@ export default function HomePage() {
       setSubmitMessage("We couldn't submit your requirement right now. Please try again.");
       setSubmitMessageType("error");
     } finally {
+      requirementGuard.afterSubmit();
       setIsSubmitting(false);
     }
   };
@@ -1056,10 +1028,10 @@ export default function HomePage() {
                       />
                     </div>
 
+                    {requirementGuard.fields}
+
                     <div className="flex flex-col gap-3 border-black/10 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="max-w-[22rem] text-center text-[11px] leading-relaxed text-black/60 sm:text-left">
-                        By submitting this form, you agree to be contacted by our team regarding your requirement.
-                      </p>
+                      <PrivacyNotice className="max-w-[22rem] text-center sm:text-left" />
 
                       <motion.button
                         type="submit"

@@ -291,6 +291,50 @@ const SHARING_PARTIES = [
   },
 ];
 
+// Draft for legal review (audit item P-03): the services this website uses to
+// process visitor data, and what it keeps in the browser.
+const WEBSITE_PROCESSORS = [
+  {
+    label: "Zoho (Zoho CRM, Zoho Sheet, Zoho Catalyst):",
+    text: "stores the enquiries and property listings you send us, and the property information shown on this website.",
+  },
+  {
+    label: "Vercel:",
+    text: "hosts this website and processes the technical data of each visit, such as your IP address, to deliver pages and protect against misuse.",
+  },
+  {
+    label: "Google (Gemini):",
+    text: "when you use AI search, the text you type is sent to Google's Gemini service to understand your requirement. Do not type personal details into the search box.",
+  },
+  {
+    label: "OpenStreetMap Foundation (Nominatim):",
+    text: "only if you press \"Use my location\", your approximate position (about 100 metres) is sent to find your area, city and PIN code.",
+  },
+  {
+    label: "Cloudflare (Turnstile):",
+    text: "where enabled, checks that forms are sent by a person and not an automated program.",
+  },
+];
+
+const BROWSER_STORAGE = [
+  {
+    label: "Cookie choices:",
+    text: "your cookie banner choice (cookie_consent_accepted, cookie_preferences).",
+  },
+  {
+    label: "Preferences:",
+    text: "currency and area unit, the last city and office type you searched, and the service you last viewed.",
+  },
+  {
+    label: "Shortlist and comparison:",
+    text: "the properties you shortlist or compare. They stay on your device and are sent to us only with an enquiry.",
+  },
+  {
+    label: "Location:",
+    text: "if you share it, your area, city, state, country and PIN code, kept only for the current browser tab. You can remove it from the location button in the header.",
+  },
+];
+
 const SECURITY_MEASURES = [
   "Encryption and secure data storage",
   "Access controls and authentication protocols",
@@ -348,7 +392,7 @@ export default function PrivacyPolicyPage() {
     <>
       <LegalHero title="Privacy Policy" />
 
-      <main className="w-full bg-white">
+      <div className="w-full bg-white">
         <div className="mx-auto w-full max-w-[1376px] px-4 pb-[56px] pt-[36px] sm:px-6 sm:pb-[64px] sm:pt-[44px] lg:pb-[4rem] lg:pt-[2.6rem]">
           <div className="space-y-[28px] sm:space-y-[32px] lg:space-y-[1.8rem]">
             <Section id="introduction" title="Introduction: Who We Are">
@@ -512,6 +556,35 @@ export default function PrivacyPolicyPage() {
               </Paragraph>
             </Section>
 
+            <Section id="website-services" title="Services Used by This Website and Browser Storage">
+              <Paragraph>
+                This website uses the following services to process the data
+                described in this policy:
+              </Paragraph>
+              <BulletList>
+                {WEBSITE_PROCESSORS.map((item) => (
+                  <BulletItem key={item.label} label={item.label} separator=" ">
+                    {item.text}
+                  </BulletItem>
+                ))}
+              </BulletList>
+              <Paragraph>
+                The website also keeps a few items in your browser&apos;s
+                storage. They are not sent to us unless stated:
+              </Paragraph>
+              <BulletList>
+                {BROWSER_STORAGE.map((item) => (
+                  <BulletItem key={item.label} label={item.label} separator=" ">
+                    {item.text}
+                  </BulletItem>
+                ))}
+              </BulletList>
+              <Paragraph>
+                You can clear this storage at any time in your browser
+                settings.
+              </Paragraph>
+            </Section>
+
             <Section id="security" title="Security of Your Personal Data">
               <Paragraph>
                 We implement robust technical and organisational measures to
@@ -627,7 +700,7 @@ export default function PrivacyPolicyPage() {
             </Section>
           </div>
         </div>
-      </main>
+      </div>
     </>
   );
 }

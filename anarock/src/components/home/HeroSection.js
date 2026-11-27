@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { createContext, useContext, useId, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { usePreferences } from "@/lib/preferences";
 import { useRouter } from "next/navigation";
@@ -33,18 +33,26 @@ const MENU = "absolute left-0 right-0 top-full z-[100] mt-2 flex flex-col overfl
 const MENU_LIST = "max-h-[clamp(160px,30vh,260px)] overflow-y-auto overscroll-contain p-1.5";
 const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A054A0] focus-visible:ring-offset-2";
 
+// Gives the control inside a Field the id of its label, so screen readers
+// announce the label with the control.
+const FieldIds = createContext(null);
+
 function Field({ label, innerRef, className = "", children }) {
+  const id = useId();
+  const ids = { control: `${id}-control`, label: `${id}-label` };
   return (
     <div className={`relative min-w-0 ${className}`} ref={innerRef}>
-      <label className={LABEL}>{label}</label>
-      {children}
+      <label id={ids.label} htmlFor={ids.control} className={LABEL}>{label}</label>
+      <FieldIds.Provider value={ids}>{children}</FieldIds.Provider>
     </div>
   );
 }
 
 function SelectTrigger({ icon: Icon, open, disabled, onClick, filled, loading, children }) {
+  const ids = useContext(FieldIds);
   return (
-    <button type="button" aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={onClick}
+    <button type="button" id={ids?.control} aria-labelledby={ids ? `${ids.label} ${ids.control}` : undefined}
+      aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={onClick}
       className={`${INPUT_BASE} flex items-center justify-between gap-2 px-3.5 text-left ${open ? INPUT_OPEN : ""}`}
     >
       <span className="flex min-w-0 items-center gap-2.5">
@@ -68,7 +76,7 @@ function MenuSearch({ value, onChange, placeholder }) {
     <div className="shrink-0 border-b border-black/10 bg-white/50 p-2.5">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" />
-        <input value={value} onChange={onChange} placeholder={placeholder} autoFocus
+        <input value={value} onChange={onChange} placeholder={placeholder} aria-label={placeholder} autoFocus
           className="h-10 w-full rounded-xl border border-[#A054A0]/20 bg-white pl-9 pr-3 text-[13px] font-medium text-black outline-none transition placeholder:text-black/40 focus:border-[#A054A0] focus:ring-2 focus:ring-[#A054A0]/10 sm:text-sm"
         />
       </div>
@@ -91,13 +99,14 @@ function Option({ active, onClick, children }) {
 }
 
 function IconInput({ icon, value, onChange, placeholder }) {
+  const ids = useContext(FieldIds);
   return (
     <div className="relative">
       <span className="pointer-events-none absolute left-3.5 top-1/2 z-10 flex h-5 w-5 -translate-y-1/2 items-center justify-center">
         {icon}
       </span>
 
-      <input type="text" inputMode="numeric" value={value} onChange={onChange} placeholder={placeholder}
+      <input id={ids?.control} type="text" inputMode="numeric" value={value} onChange={onChange} placeholder={placeholder}
         className={`${INPUT_BASE} pl-11 pr-4 font-semibold text-black placeholder:font-normal placeholder:text-black/40`}
       />
     </div>
@@ -472,7 +481,7 @@ export default function HeroSection({ consentGranted, locationData }) {
   );
 
   return (
-    <main
+    <div
       className="relative min-h-dvh w-full overflow-x-hidden bg-[#160B17] lg:min-h-dvh lg:h-auto"
       style={{
         minHeight: "100dvh",
@@ -803,6 +812,6 @@ export default function HeroSection({ consentGranted, locationData }) {
           </form>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

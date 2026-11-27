@@ -521,7 +521,7 @@ function CommercialLeasingAndAdvisoryPageContent() {
   ];
 
   return (
-    <main className="min-h-screen overflow-hidden bg-white text-black">
+    <div className="min-h-screen overflow-hidden bg-white text-black">
       {/* HERO */}
       <section className="relative isolate flex min-h-[320px] w-full items-center overflow-hidden px-6 py-14 text-white sm:min-h-[400px] sm:px-10 md:px-16 lg:min-h-[495px] lg:px-[7.8%]">
         <Image
@@ -749,7 +749,7 @@ function CommercialLeasingAndAdvisoryPageContent() {
                         <div className="mt-auto flex items-center justify-between border-t border-white/30 pt-4">
                           <Link
                             href={item.href}
-                            className="inline-flex items-center gap-2 text-sm font-semibold"
+                            className="inline-flex min-h-6 items-center gap-2 text-sm font-semibold"
                           >
                             View Report <ArrowUpRight size={16} />
                           </Link>
@@ -758,12 +758,14 @@ function CommercialLeasingAndAdvisoryPageContent() {
                               href={item.image}
                               download
                               aria-label="Download report"
+                              className="inline-flex h-8 w-8 items-center justify-center"
                             >
                               <Download size={17} />
                             </a>
                             <button
                               type="button"
                               aria-label="Share report"
+                              className="inline-flex h-8 w-8 items-center justify-center"
                               onClick={() => {
                                 if (navigator.share) {
                                   navigator
@@ -865,14 +867,14 @@ function CommercialLeasingAndAdvisoryPageContent() {
                     <a
                       href="#enquiry"
                       aria-label={`${leader.name} LinkedIn`}
-                      className="hover:text-[#7D397D]"
+                      className="inline-flex h-8 w-8 items-center justify-center hover:text-[#7D397D]"
                     >
                       <ArrowUpRight size={15} />{" "}
                     </a>
                     <a
                       href="#enquiry"
                       aria-label={`Email ${leader.name}`}
-                      className="hover:text-[#7D397D]"
+                      className="inline-flex h-8 w-8 items-center justify-center hover:text-[#7D397D]"
                     >
                       <Mail size={15} />
                     </a>
@@ -956,7 +958,7 @@ function CommercialLeasingAndAdvisoryPageContent() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 export default function CommercialLeasingAndAdvisoryPage() {

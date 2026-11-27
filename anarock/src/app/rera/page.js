@@ -101,7 +101,7 @@ export default function ReraPage() {
     <>
       <LegalHero title="RERA" />
 
-      <main className="w-full bg-white">
+      <div className="w-full bg-white">
         <div className="mx-auto w-full max-w-[1376px] px-4 pb-[56px] pt-[36px] sm:px-6 sm:pb-[64px] sm:pt-[44px] lg:pb-[4rem] lg:pt-[2.6rem]">
           {/* Tablet and desktop: table */}
           <div className="hidden overflow-hidden border border-black/10 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] md:block">
@@ -175,7 +175,7 @@ export default function ReraPage() {
             ))}
           </ul>
         </div>
-      </main>
+      </div>
     </>
   );
 }

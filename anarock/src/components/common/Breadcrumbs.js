@@ -67,7 +67,7 @@ export default function Breadcrumbs({ items = [] }) {
           <Link
             href="/"
             aria-label="Home"
-            className="group inline-flex items-center gap-2 font-medium text-black/85 transition-colors duration-300 hover:text-[#A054A0]"
+            className="group inline-flex min-h-6 items-center gap-2 font-medium text-black/85 transition-colors duration-300 hover:text-[#A054A0]"
           >
             <Home className="h-3.5 w-3.5" strokeWidth={1.8} />
             <span className="tracking-[0.08em]">Home</span>
@@ -98,7 +98,7 @@ export default function Breadcrumbs({ items = [] }) {
               ) : (
                 <Link
                   href={item.href}
-                  className="min-w-0 break-words font-medium tracking-[0.08em] text-black/85 transition-colors duration-300 hover:text-[#A054A0]"
+                  className="inline-flex min-h-6 min-w-0 items-center break-words font-medium tracking-[0.08em] text-black/85 transition-colors duration-300 hover:text-[#A054A0]"
                 >
                   {item.label}
                 </Link>

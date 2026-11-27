@@ -1,237 +1,32 @@
 import { NextResponse } from "next/server";
+import { getZohoAccessToken } from "@/lib/zoho";
+import {
+  normalizePhone,
+  isValidPhone,
+  isValidEmail,
+  findCityId,
+  mapLocationToLeadOwnerTeam,
+} from "@/lib/leadCommon";
 import {
   createRateLimiter,
   readJsonBody,
 } from "@/lib/requestGuard";
+import { checkFormSubmission } from "@/lib/formProtection";
 import {
   addRepeatEnquiryNote,
   findDuplicateLeadId,
   isDuplicateError,
   PUBLIC_SUCCESS_MESSAGE,
 } from "@/lib/repeatEnquiry";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-const ACCOUNTS_URL = "https://accounts.zoho.in";
-const DEFAULT_API_URL = "https://www.zohoapis.in";
-const CLIENT_ID = process.env.ZOHO_CLIENT_ID;
-const CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET;
-const REFRESH_TOKEN = process.env.ZOHO_REFRESH_TOKEN;
-let zohoTokenCache = {
-  accessToken: null,
-  expiresAt: 0,
-  apiDomain: DEFAULT_API_URL,
-};
 
-async function generateZohoAccessToken() {
-  if (!CLIENT_ID) {
-    throw new Error("ZOHO_CLIENT_ID is missing from .env.local");
-  }
 
-  if (!CLIENT_SECRET) {
-    throw new Error("ZOHO_CLIENT_SECRET is missing from .env.local");
-  }
 
-  if (!REFRESH_TOKEN) {
-    throw new Error("ZOHO_REFRESH_TOKEN is missing from .env.local");
-  }
 
-  const tokenUrl = `${ACCOUNTS_URL}/oauth/v2/token`;
-  const params = new URLSearchParams();
-  params.set("refresh_token", REFRESH_TOKEN.trim());
-  params.set("client_id", CLIENT_ID.trim());
-  params.set("client_secret", CLIENT_SECRET.trim());
-  params.set("grant_type", "refresh_token");
-  const response = await fetch(tokenUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: params.toString(),
-    cache: "no-store",
-  });
-  const responseText = await response.text();
-  let data;
-  try {
-    data = JSON.parse(responseText);
-  } catch {
-    throw new Error("Zoho OAuth returned an invalid response.");
-  }
 
-  if (!response.ok) {
-    throw new Error(
-      data?.error_description ||
-      data?.error ||
-      `Unable to generate Zoho access token. HTTP ${response.status}`,
-    );
-  }
 
-  if (!data?.access_token) {
-    throw new Error("Zoho did not return an access token.");
-  }
-
-  const accessToken = data.access_token;
-  const expiresInSeconds = Number(data.expires_in) || 3600;
-  const refreshAfterMilliseconds = Math.min(
-    59 * 60 * 1000,
-    Math.max(60, expiresInSeconds - 60) * 1000,
-  );
-
-  const apiDomain = String(data.api_domain || DEFAULT_API_URL).replace(
-    /\/$/,
-    "",
-  );
-
-  zohoTokenCache = {
-    accessToken,
-
-    expiresAt: Date.now() + refreshAfterMilliseconds,
-
-    apiDomain,
-  };
-
-  return zohoTokenCache;
-}
-
-async function getZohoAccessToken(forceRefresh = false) {
-  if (
-    !forceRefresh &&
-    zohoTokenCache.accessToken &&
-    zohoTokenCache.expiresAt > Date.now()
-  ) {
-    return zohoTokenCache;
-  }
-
-  return await generateZohoAccessToken();
-}
-
-function normalizeCityName(value) {
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function isValidCityName(value) {
-  if (!value) return false;
-  return /^[\p{L}\p{N} .'-]{1,100}$/u.test(value);
-}
-
-async function findCityId(tokenInfo, cityName) {
-  const cleanCity = normalizeCityName(cityName);
-
-  if (!cleanCity || !isValidCityName(cleanCity)) {
-    return null;
-  }
-
-  const criteria = `(Name:equals:${cleanCity})`;
-
-  const url =
-    `${tokenInfo.apiDomain}/crm/v8/City/search` +
-    `?criteria=${encodeURIComponent(criteria)}` +
-    `&fields=id,Name`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${tokenInfo.accessToken}`,
-      "Content-Type": "application/json",
-    },
-    cache: "no-store",
-  });
-
-  if (response.status === 401) {
-    const error = new Error("Zoho access token expired while searching City.");
-
-    error.code = "ZOHO_ACCESS_TOKEN_EXPIRED";
-
-    throw error;
-  }
-
-  const responseText = await response.text();
-
-  let data;
-
-  try {
-    data = responseText ? JSON.parse(responseText) : {};
-  } catch {
-    throw new Error("Invalid response from Zoho City search.");
-  }
-
-  if (response.status === 204 || !response.ok) {
-    return null;
-  }
-
-  const records = Array.isArray(data?.data) ? data.data : [];
-
-  const exactCity = records.find(
-    (record) =>
-      String(record?.Name || "")
-        .trim()
-        .toLowerCase() === cleanCity.toLowerCase(),
-  );
-
-  return exactCity?.id || null;
-}
-
-function mapLocationToLeadOwnerTeam(city, state) {
-  const cityLower = String(city || "")
-    .trim()
-    .toLowerCase();
-
-  const stateLower = String(state || "")
-    .trim()
-    .toLowerCase();
-
-  if (cityLower.includes("bengaluru") || cityLower.includes("bangalore")) {
-    return "Bengaluru";
-  }
-
-  if (cityLower.includes("chennai")) {
-    return "Chennai";
-  }
-
-  if (cityLower.includes("hyderabad")) {
-    return "Hyderabad";
-  }
-
-  if (cityLower.includes("kolkata")) {
-    return "Kolkata";
-  }
-
-  if (cityLower.includes("pune")) {
-    return "Pune";
-  }
-
-  if (
-    cityLower.includes("mumbai") ||
-    cityLower.includes("ahmedabad") ||
-    cityLower.includes("surat") ||
-    cityLower.includes("jaipur") ||
-    stateLower.includes("maharashtra") ||
-    stateLower.includes("gujarat") ||
-    stateLower.includes("goa") ||
-    stateLower.includes("rajasthan")
-  ) {
-    return "West";
-  }
-
-  if (
-    cityLower.includes("agra") ||
-    cityLower.includes("delhi") ||
-    cityLower.includes("noida") ||
-    cityLower.includes("gurugram") ||
-    cityLower.includes("gurgaon") ||
-    cityLower.includes("chandigarh") ||
-    stateLower.includes("delhi") ||
-    stateLower.includes("haryana") ||
-    stateLower.includes("punjab") ||
-    stateLower.includes("uttar pradesh") ||
-    stateLower.includes("uttarakhand")
-  ) {
-    return "North";
-  }
-
-  return "Platform";
-}
 
 async function createLeadInCRM(tokenInfo, recordData) {
   const url = `${tokenInfo.apiDomain}/crm/v8/Leads`;
@@ -328,19 +123,8 @@ function cleanSingleLine(value, maxLength) {
   return cleanText(value, maxLength).replace(/\s+/g, " ");
 }
 
-function normalizePhone(value) {
-  return String(value || "")
-    .trim()
-    .replace(/[^\d+]/g, "");
-}
 
-function isValidPhone(value) {
-  return /^\+?[1-9]\d{7,14}$/.test(value);
-}
 
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
-}
 
 function safePositiveNumber(value, max = 100000000) {
   if (value === undefined || value === null || value === "") return undefined;
@@ -357,7 +141,7 @@ function badRequest(message, status = 400, extraHeaders = {}) {
 }
 
 export async function POST(request) {
-  const rateLimit = checkRateLimit(request);
+  const rateLimit = await checkRateLimit(request);
 
   if (!rateLimit.allowed) {
     return badRequest(
@@ -374,6 +158,19 @@ export async function POST(request) {
   }
 
   const body = parsed.data;
+  const guard = await checkFormSubmission(request, body);
+
+  if (!guard.ok) {
+    return guard.silent
+      ? NextResponse.json(
+          { success: true, message: PUBLIC_SUCCESS_MESSAGE },
+          { headers: { "Cache-Control": "no-store" } },
+        )
+      : NextResponse.json(
+          { success: false, message: guard.message, code: guard.code },
+          { status: guard.status, headers: { "Cache-Control": "no-store" } },
+        );
+  }
 
   try {
     let firstName = cleanSingleLine(body?.firstName, MAX_LENGTHS.firstName);
@@ -571,7 +368,7 @@ export async function POST(request) {
       throw error;
     }
   } catch (error) {
-    console.error(
+    logger.error(
       "[LEAD2] Lead creation failed:",
       error?.code || "UNKNOWN_ERROR",
     );

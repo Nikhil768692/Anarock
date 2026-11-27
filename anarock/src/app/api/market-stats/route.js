@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStatsTable, runZcqlQuery, STATS_TABLE_ID } from "@/lib/catalyst";
 import { getOrFetchCache } from "@/lib/cache";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ async function fetchLatestStatsRows() {
       );
     } catch (error) {
       zcqlBlockedUntil = Date.now() + ZCQL_RETRY_AFTER_MS;
-      console.warn("[Market Stats API] ZCQL failed, reading the whole table:", {
+      logger.warn("[Market Stats API] ZCQL failed, reading the whole table:", {
         message: error?.message,
         status: error?.status,
       });
@@ -176,7 +177,7 @@ export async function GET() {
       },
     );
   } catch (error) {
-    console.error("[Market Stats API] Failed:", {
+    logger.error("[Market Stats API] Failed:", {
       message: error?.message,
       status: error?.status,
       code: error?.code,

@@ -24,6 +24,55 @@ const folderPath = (value) => {
   return folder;
 };
 
+// The data is typed in by hand, so a few values are tidied here:
+// "LEASE", "lease " and "Lease" all become "Lease", and a distance typed as
+// a bare number ("2.5") is shown in kilometres ("2.5 km").
+const AVAILABILITY_TYPES = new Map([
+  ["lease", "Lease"],
+  ["rent", "Lease"],
+  ["sale", "Sale"],
+  ["outright", "Sale"],
+  ["lease or sale", "Lease or Sale"],
+  ["lease/sale", "Lease or Sale"],
+  ["lease & sale", "Lease or Sale"],
+  ["lease and sale", "Lease or Sale"],
+  ["both", "Lease or Sale"],
+]);
+
+function availabilityType(value) {
+  const text = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  return AVAILABILITY_TYPES.get(text.toLowerCase()) || text;
+}
+
+function distance(value) {
+  const text = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (/^\d+(\.\d+)?$/.test(text)) return `${text} km`;
+  return text;
+}
+
+// Catalyst column that holds the Zoho CRM record ID of the property. It is used
+// only on the server (to link enquiries to the CRM record) and never sent to
+// the browser. Set CATALYST_CRM_ID_COLUMN if the column has another name.
+const CRM_ID_COLUMNS = [
+  process.env.CATALYST_CRM_ID_COLUMN,
+  "CRMPropertyId",
+  "CRMPropertyID",
+  "CRM_Property_ID",
+  "CRMID",
+  "CRM_ID",
+  "ZohoPropertyId",
+  "ZohoPropertyID",
+].filter(Boolean);
+
+function crmIdOf(row) {
+  for (const column of CRM_ID_COLUMNS) {
+    const value = String(row?.[column] ?? "").trim();
+    if (/^\d+$/.test(value)) return value;
+  }
+  return "";
+}
+
 export function mapProperty(row) {
   if (!row || typeof row !== "object") {
     return null;
@@ -34,8 +83,9 @@ export function mapProperty(row) {
   return {
     id: String(row.ROWID || ""),
     rowId: String(row.ROWID || ""),
+    crmID: crmIdOf(row),
     slug: clean(row.PropertyName),
-    availabilityType: clean(row.AvailabilityType),
+    availabilityType: availabilityType(row.AvailabilityType),
     type: clean(row.OfficeType),
     officeType: clean(row.OfficeType),
     name: clean(row.PropertyName),
@@ -47,8 +97,8 @@ export function mapProperty(row) {
     location: clean(row.Location),
     latitude: num(row.Latitude),
     longitude: num(row.Longitude),
-    distanceFromMetro: clean(row.DistanceFromMetro),
-    distanceFromAirport: clean(row.DistanceFromAirport),
+    distanceFromMetro: distance(row.DistanceFromMetro),
+    distanceFromAirport: distance(row.DistanceFromAirport),
     ImageFolderPath: folder,
     buildingType: clean(row.BuildingType),
     buildingName: clean(row.BuildingName),
@@ -112,4 +162,53 @@ export function mapProperty(row) {
     centerHighlights: clean(row.CenterHighlights),
     aiAttributes: clean(row.AIAttributes),
   };
+}
+
+// Fields the website shows. Only these leave the server: internal and
+// negotiation fields (achievable rent, deposit, escalation, lock-in, exact
+// coordinates, CRM IDs and so on) stay in the server cache.
+// Add a field here only when a page needs it and the business agrees it is public.
+export const PUBLIC_PROPERTY_FIELDS = [
+  "id",
+  "rowId",
+  "slug",
+  "name",
+  "type",
+  "officeType",
+  "city",
+  "micromarket",
+  "address",
+  "ImageFolderPath",
+  "developer",
+  "operator",
+  "floor",
+  "availability",
+  "buildingStructure",
+  "buildingCertifications",
+  "estYearOfCompletion",
+  "distanceFromMetro",
+  "distanceFromAirport",
+  "totalLeasableAreaAvailable",
+  "quotedRent",
+  "monthlyCostPerSeat",
+  "NoOfSeatsOffered",
+  "inclusions",
+  "exclusions",
+  "aiAttributes",
+];
+
+export function toPublicProperty(property) {
+  if (!property || typeof property !== "object") return null;
+
+  const result = {};
+  for (const field of PUBLIC_PROPERTY_FIELDS) {
+    if (property[field] !== undefined) result[field] = property[field];
+  }
+  return result;
+}
+
+export function toPublicProperties(properties) {
+  return (Array.isArray(properties) ? properties : [])
+    .map(toPublicProperty)
+    .filter(Boolean);
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const ALLOWED_CURRENCIES = ["INR", "AED", "USD", "EUR", "SGD"];
@@ -74,7 +75,7 @@ async function fetchExchangeRates() {
   );
 
   if (missingCurrencies.length > 0) {
-    console.warn(
+    logger.warn(
       `[ExchangeRates] Missing rates for: ${missingCurrencies.join(", ")}. Using defaults where available.`,
     );
   }
@@ -127,7 +128,7 @@ export async function GET() {
       cached: false,
     });
   } catch (error) {
-    console.error("[ExchangeRates] API error:", error?.message || error);
+    logger.error("[ExchangeRates] API error:", error?.message || error);
     if (cache.rates) {
       return NextResponse.json({
         success: true,

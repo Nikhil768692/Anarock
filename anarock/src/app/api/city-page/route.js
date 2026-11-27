@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { catalystFetch, projectId } from "@/lib/catalyst";
 import { getOrFetchCache } from "@/lib/cache";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -227,7 +228,7 @@ async function settle(promise, label) {
   try {
     return await promise;
   } catch (error) {
-    console.error(`[City Page API] ${label} failed:`, {
+    logger.error(`[City Page API] ${label} failed:`, {
       message: error?.message,
       status: error?.status,
     });

@@ -1,5 +1,6 @@
 import "server-only";
 import { createRequire } from "module";
+import { logger } from "@/lib/logger";
 const require = createRequire(import.meta.url);
 export const projectId = "53125000000013053";
 export const PROPERTIES_TABLE_ID = "53125000000038011";
@@ -92,7 +93,7 @@ async function refreshCatalystAccessToken() {
         cache: "no-store",
       });
     } catch (error) {
-      console.error(
+      logger.error(
         "[Catalyst Auth] OAuth request failed:",
         error?.message || error,
       );
@@ -126,7 +127,7 @@ async function refreshCatalystAccessToken() {
     const expiresInSeconds = Math.max(60, Number(data.expires_in) || 3600);
     state.accessToken = data.access_token;
     state.accessTokenExpiresAt = Date.now() + expiresInSeconds * 1000;
-    console.log("[Catalyst Auth] Access token refreshed.", {
+    logger.info("[Catalyst Auth] Access token refreshed.", {
       expiresInSeconds,
       expiresAt: new Date(state.accessTokenExpiresAt).toISOString(),
     });
@@ -135,7 +136,7 @@ async function refreshCatalystAccessToken() {
   })()
     .catch((error) => {
       clearAccessToken();
-      console.error("[Catalyst Auth] Token refresh failed:", error?.message || error);
+      logger.error("[Catalyst Auth] Token refresh failed:", error?.message || error);
       throw error;
     })
     .finally(() => {
@@ -183,7 +184,7 @@ export async function catalystFetch(url, options = {}, retryCount = 0) {
     cache: "no-store",
   });
   if (response.status === 401 && retryCount < MAX_AUTH_RETRIES) {
-    console.warn(
+    logger.warn(
       "[Catalyst Auth] Received 401. Refreshing token and retrying.",
     );
 

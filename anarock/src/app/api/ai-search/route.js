@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getAllProperties } from "@/lib/propertiesCache";
-import { createRateLimiter, readJsonBody } from "@/lib/requestGuard";
+import { toPublicProperties } from "@/lib/propertyMapper";
+import {
+    createRateLimiter,
+    isCrossSiteRequest,
+    readJsonBody,
+} from "@/lib/requestGuard";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -506,7 +512,7 @@ async function interpretQuery(prompt) {
     const key = String(process.env.GEMINI_API_KEY || "").trim();
 
     if (!key) {
-        console.error(
+        logger.error(
             "[AI Search] GEMINI_API_KEY is missing from the server environment.",
         );
         throw new Error("AI search is not configured.");
@@ -765,7 +771,7 @@ function hardFilter(properties, body, extraction) {
     };
 
     if (!Array.isArray(properties)) {
-        console.error("[AI Search] getAllProperties() did not return an array.");
+        logger.error("[AI Search] getAllProperties() did not return an array.");
 
         return [];
     }
@@ -884,9 +890,13 @@ function sortResults(results, sort) {
 }
 
 export async function POST(request) {
-    const minuteLimit = checkMinuteLimit(request);
+    if (isCrossSiteRequest(request)) {
+        return aiSearchError("AI search can only be used from our website.", 403);
+    }
+
+    const minuteLimit = await checkMinuteLimit(request);
     const dailyLimit = minuteLimit.allowed
-        ? checkDailyLimit(request)
+        ? await checkDailyLimit(request)
         : { allowed: true };
 
     if (!minuteLimit.allowed || !dailyLimit.allowed) {
@@ -922,7 +932,7 @@ export async function POST(request) {
         const geminiKey = String(process.env.GEMINI_API_KEY || "").trim();
 
         if (!geminiKey) {
-            console.error(
+            logger.error(
                 "[AI Search] GEMINI_API_KEY is missing. Add it to the server environment variables and redeploy.",
             );
             return NextResponse.json(
@@ -1082,7 +1092,7 @@ export async function POST(request) {
         return NextResponse.json(
             {
                 success: true,
-                data: pageResults.map((item) => item.property),
+                data: toPublicProperties(pageResults.map((item) => item.property)),
                 total,
                 page,
                 pageSize,
@@ -1098,7 +1108,7 @@ export async function POST(request) {
             },
         );
     } catch (error) {
-        console.error("[AI Search] Error:", error?.code || error?.message || error);
+        logger.error("[AI Search] Error:", error?.code || error?.message || error);
 
         if (error?.code === "AI_DAILY_LIMIT") {
             return aiSearchError(

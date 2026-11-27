@@ -102,7 +102,7 @@ export default function ComparePage() {
 
   useEffect(() => {
     document.title =
-      "Commercial Property Comparison & Office Space Analytics | Compare Workspaces";
+      "Compare Properties | Anarock";
     const setMetaTag = (name, content, isProperty = false) => {
       const attr = isProperty ? "property" : "name";
       let element = document.querySelector(`meta[${attr}="${name}"]`);
@@ -596,7 +596,7 @@ export default function ComparePage() {
         ]}
       />
 
-      <main className="min-h-screen bg-[#FDFCFD] px-4 py-6 pb-24 sm:px-8 lg:px-12">
+      <div className="min-h-screen bg-[#FDFCFD] px-4 py-6 pb-24 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-[1536px]">
           {/* Header Section */}
           <section className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -844,7 +844,7 @@ export default function ComparePage() {
             </div>
           )}
         </div>
-      </main>
+      </div>
 
       {/* Property Selector Modal */}
       {isModalOpen && (

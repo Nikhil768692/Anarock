@@ -1,6 +1,6 @@
 import WishlistClient from "./WishlistClient";
 export const metadata = {
-  title: "Shortlisted Commercial Properties | Real Estate Wishlist | Anarock",
+  title: "Shortlisted Commercial Properties",
   description: "Manage and compare your saved commercial properties, office spaces, retail shops across top Indian real estate hubs including Mumbai, Bengaluru, Gurugram, Noida, Pune, and Hyderabad.",
   keywords: [
     "commercial properties wishlist",

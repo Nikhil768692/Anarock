@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 const globalState = globalThis;
 if (!globalState.__anarockMemoryCache) {
   globalState.__anarockMemoryCache = new Map();
@@ -45,7 +46,7 @@ export async function getOrFetchCache(key, fetcher, ttlMs, options = {}) {
             current.promise = null;
             cache.set(key, current);
           }
-          console.error(
+          logger.error(
             `[MemoryCache] Background refresh failed for "${String(key)}":`,
             error?.message || "Unknown error",
           );

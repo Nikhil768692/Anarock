@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { createRateLimiter, isCrossSiteRequest } from "@/lib/requestGuard";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,6 +11,18 @@ const CACHE_TTL = 24 * 60 * 60 * 1000;
 const MIN_REQUEST_INTERVAL = 1200;
 const MAX_CACHE_ENTRIES = 1000;
 const MAX_BODY_SIZE = 2048;
+
+// A visitor looks up the location only when pressing "Use my location".
+const checkMinuteLimit = createRateLimiter({
+  name: "location-minute",
+  windowMs: 60 * 1000,
+  max: 5,
+});
+const checkDailyLimit = createRateLimiter({
+  name: "location-day",
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 50,
+});
 
 const locationCache = globalThis.__anarockLocationCache || new Map();
 
@@ -23,7 +37,7 @@ globalThis.__anarockLocationCache = locationCache;
 globalThis.__anarockLocationInFlight = locationInFlight;
 globalThis.__anarockLocationRequestState = locationRequestState;
 
-function jsonError(message, status) {
+function jsonError(message, status, extraHeaders = {}) {
   return NextResponse.json(
     {
       success: false,
@@ -32,7 +46,7 @@ function jsonError(message, status) {
     },
     {
       status,
-      headers: { "Cache-Control": "no-store" },
+      headers: { "Cache-Control": "no-store", ...extraHeaders },
     },
   );
 }
@@ -263,6 +277,23 @@ async function reverseGeocodeNominatim(latitude, longitude) {
 }
 
 export async function POST(request) {
+  if (isCrossSiteRequest(request)) {
+    return jsonError("Location lookup can only be used from our website.", 403);
+  }
+
+  const minuteLimit = await checkMinuteLimit(request);
+  const dailyLimit = minuteLimit.allowed
+    ? await checkDailyLimit(request)
+    : { allowed: true };
+
+  if (!minuteLimit.allowed || !dailyLimit.allowed) {
+    return jsonError("Too many location requests. Please try again later.", 429, {
+      "Retry-After": String(
+        !minuteLimit.allowed ? minuteLimit.retryAfter : dailyLimit.retryAfter,
+      ),
+    });
+  }
+
   let body;
 
   try {
@@ -309,7 +340,7 @@ export async function POST(request) {
       },
     );
   } catch (error) {
-    console.error("[LOCATION] Reverse geocoding failed:", {
+    logger.error("[LOCATION] Reverse geocoding failed:", {
       code: error?.code || "LOCATION_UNAVAILABLE",
       status: error?.status || null,
     });

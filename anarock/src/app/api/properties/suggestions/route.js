@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAllProperties } from "@/lib/propertiesCache";
+import { toPublicProperties } from "@/lib/propertyMapper";
+import { logger } from "@/lib/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -446,7 +448,9 @@ export async function GET(request) {
         const totalPages = Math.ceil(total / pageSize);
         const start = (page - 1) * pageSize;
         const end = start + pageSize;
-        const responseData = scored.slice(start, end).map((item) => item.property);
+        const responseData = toPublicProperties(
+            scored.slice(start, end).map((item) => item.property),
+        );
         const hasMore = page < totalPages;
         return NextResponse.json(
             {
@@ -459,7 +463,6 @@ export async function GET(request) {
                 hasMore,
                 filteredResultCount: 0,
                 suggestionPoolCount: total,
-                referenceCoordinates,
                 cachedAt: Date.now(),
                 processingTime: Date.now() - requestStartedAt,
             },
@@ -473,8 +476,8 @@ export async function GET(request) {
             },
         );
     } catch (error) {
-        console.error("[Suggestions API] ERROR:", error);
-        console.error("[Suggestions API] MESSAGE:", error?.message);
+        logger.error("[Suggestions API] ERROR:", error);
+        logger.error("[Suggestions API] MESSAGE:", error?.message);
         return NextResponse.json(
             {
                 success: false,

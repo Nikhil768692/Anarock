@@ -1,5 +1,7 @@
+import { logger } from "@/lib/logger";
 // Shared helpers that protect public API routes:
-// a client IP that cannot be faked, simple rate limiting and safe JSON parsing.
+// a client IP that cannot be faked, rate limiting, a cross-site check and safe
+// JSON parsing. Bot checks for public forms are in formProtection.js.
 
 // How many proxies in front of the app add their own entry to the end of
 // X-Forwarded-For. The client IP is read that many entries from the end, so a
@@ -35,16 +37,62 @@ export function getClientIp(request) {
   return "unknown";
 }
 
-// Fixed-window rate limiter kept in server memory.
-// Each server instance keeps its own count, so the API Gateway throttle
-// remains the main protection when several instances run.
+// Fixed-window rate limiter.
+// When UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are set, the count is
+// kept in Upstash Redis and shared by every server instance. Otherwise (or if
+// Redis cannot be reached) each server instance keeps its own count in memory.
+// The returned function is async: always `await checkRateLimit(request)`.
+const UPSTASH_URL = String(process.env.UPSTASH_REDIS_REST_URL || "").replace(
+  /\/+$/,
+  "",
+);
+const UPSTASH_TOKEN = String(process.env.UPSTASH_REDIS_REST_TOKEN || "");
+const SHARED_LIMIT_TIMEOUT_MS = 1500;
+
+async function sharedHit(key, windowMs) {
+  // SET ... NX starts the window once; INCR counts; PTTL gives the time left.
+  const response = await fetch(`${UPSTASH_URL}/pipeline`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${UPSTASH_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([
+      ["SET", key, "0", "PX", String(windowMs), "NX"],
+      ["INCR", key],
+      ["PTTL", key],
+    ]),
+    cache: "no-store",
+    signal: AbortSignal.timeout(SHARED_LIMIT_TIMEOUT_MS),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (
+    !response.ok ||
+    !Array.isArray(data) ||
+    data.length !== 3 ||
+    data.some((item) => item?.error)
+  ) {
+    throw new Error("Shared rate limit store did not answer.");
+  }
+
+  const count = Number(data[1].result);
+  const ttlMs = Number(data[2].result);
+
+  if (!Number.isFinite(count)) {
+    throw new Error("Shared rate limit store gave an invalid count.");
+  }
+
+  return { count, ttlMs: ttlMs > 0 ? ttlMs : windowMs };
+}
+
 export function createRateLimiter({ name, windowMs, max }) {
   const storeKey = `__ANAROCK_RATE_LIMIT_${name}`;
   const store = globalThis[storeKey] || new Map();
   globalThis[storeKey] = store;
 
-  return function checkRateLimit(request) {
-    const identifier = getClientIp(request);
+  function memoryHit(identifier) {
     const now = Date.now();
 
     if (store.size > MAX_TRACKED_CLIENTS) {
@@ -59,20 +107,56 @@ export function createRateLimiter({ name, windowMs, max }) {
 
     if (!existing || now - existing.windowStart >= windowMs) {
       store.set(identifier, { count: 1, windowStart: now });
-      return { allowed: true, retryAfter: 0 };
-    }
-
-    if (existing.count >= max) {
-      const retryAfter = Math.max(
-        1,
-        Math.ceil((windowMs - (now - existing.windowStart)) / 1000),
-      );
-      return { allowed: false, retryAfter };
+      return { count: 1, ttlMs: windowMs };
     }
 
     existing.count += 1;
+    return { count: existing.count, ttlMs: windowMs - (now - existing.windowStart) };
+  }
+
+  return async function checkRateLimit(request) {
+    const identifier = getClientIp(request);
+    let hit;
+
+    if (UPSTASH_URL && UPSTASH_TOKEN) {
+      try {
+        hit = await sharedHit(`anarock:rl:${name}:${identifier}`, windowMs);
+      } catch (error) {
+        logger.error("[Rate limit] Shared store unavailable:", error?.message);
+      }
+    }
+
+    hit = hit || memoryHit(identifier);
+
+    if (hit.count > max) {
+      return {
+        allowed: false,
+        retryAfter: Math.max(1, Math.ceil(hit.ttlMs / 1000)),
+      };
+    }
+
     return { allowed: true, retryAfter: 0 };
   };
+}
+
+// Rejects browser requests sent from another website. A request without an
+// Origin header (for example a server-to-server call) is left to the other checks.
+export function isCrossSiteRequest(request) {
+  if (request.headers.get("sec-fetch-site") === "cross-site") {
+    return true;
+  }
+
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+
+  const host =
+    request.headers.get("x-forwarded-host") || request.headers.get("host");
+
+  try {
+    return new URL(origin).host !== String(host || "").split(",")[0].trim();
+  } catch {
+    return true;
+  }
 }
 
 // Reads a JSON body with a size cap.

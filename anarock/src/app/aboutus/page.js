@@ -420,7 +420,7 @@ function JourneyYear({ item, index, now = false }) {
 
 export default function AboutUsPage() {
     return (
-        <main className="w-full min-w-0 overflow-x-clip text-black">
+        <div className="w-full min-w-0 overflow-x-clip text-black">
             <Breadcrumbs items={[{
                 label: "About us", href: "/aboutus",
             }]} />
@@ -813,6 +813,6 @@ export default function AboutUsPage() {
                     </div>
                 </div>
             </section>
-        </main>
+        </div>
     );
 }

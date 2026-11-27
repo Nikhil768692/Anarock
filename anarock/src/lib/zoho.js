@@ -1,8 +1,13 @@
+// Shared Zoho OAuth access token for every server route (CRM leads, cities,
+// micro-markets). One refresh at a time; after Zoho reports too many token
+// requests, new refreshes wait 5 minutes instead of making it worse.
 const globalState = globalThis;
 
 const TOKEN_REFRESH_BUFFER_MS = 2 * 60 * 1000;
 const MAX_AUTH_RETRIES = 1;
 const DEFAULT_TIMEOUT_MS = 15000;
+const TOKEN_REQUEST_TIMEOUT_MS = 10000;
+const AUTH_RATE_LIMIT_WAIT_MS = 5 * 60 * 1000;
 
 if (!globalState.__anarockZoho) {
   globalState.__anarockZoho = {
@@ -10,6 +15,7 @@ if (!globalState.__anarockZoho) {
     accessTokenExpiresAt: 0,
     apiDomain: null,
     refreshPromise: null,
+    authFailureUntil: 0,
   };
 }
 
@@ -57,6 +63,13 @@ async function refreshZohoAccessToken() {
     return state.refreshPromise;
   }
 
+  if (state.authFailureUntil && Date.now() < state.authFailureUntil) {
+    const error = new Error("Zoho authentication is temporarily rate limited.");
+    error.code = "ZOHO_AUTH_RATE_LIMITED";
+    error.httpStatus = 429;
+    throw error;
+  }
+
   state.refreshPromise = (async () => {
     const clientId = required("ZOHO_CLIENT_ID");
     const clientSecret = required("ZOHO_CLIENT_SECRET");
@@ -81,6 +94,8 @@ async function refreshZohoAccessToken() {
       body: body.toString(),
 
       cache: "no-store",
+
+      signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
     });
 
     const text = await response.text();
@@ -93,6 +108,19 @@ async function refreshZohoAccessToken() {
       throw new Error("Zoho OAuth returned an invalid response");
     }
 
+    if (
+      response.status === 429 ||
+      String(data?.error || data?.error_description || "")
+        .toLowerCase()
+        .includes("too many requests")
+    ) {
+      state.authFailureUntil = Date.now() + AUTH_RATE_LIMIT_WAIT_MS;
+      const error = new Error("Zoho OAuth rate limit reached.");
+      error.code = "ZOHO_AUTH_RATE_LIMITED";
+      error.httpStatus = 429;
+      throw error;
+    }
+
     if (!response.ok || !data?.access_token) {
       const error = new Error(
         data?.error_description ||
@@ -102,10 +130,14 @@ async function refreshZohoAccessToken() {
 
       error.status = response.status;
 
-      error.code = data?.error || "ZOHO_OAUTH_REFRESH_FAILED";
+      error.code = "ZOHO_AUTH_FAILED";
+      error.zohoError = data?.error || null;
+      error.httpStatus = 502;
 
       throw error;
     }
+
+    state.authFailureUntil = 0;
 
     const expiresInSeconds = Math.max(60, Number(data.expires_in) || 3600);
 

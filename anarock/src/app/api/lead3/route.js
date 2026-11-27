@@ -1,20 +1,28 @@
-import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { getClientIp } from "@/lib/requestGuard";
+import { getZohoAccessToken } from "@/lib/zoho";
+import {
+  createRequestId,
+  normalizeText,
+  normalizePhone,
+  isValidPhone,
+  isValidEmail,
+  findCityId,
+  mapLocationToLeadOwnerTeam,
+} from "@/lib/leadCommon";
+import { createRateLimiter, readJsonBody } from "@/lib/requestGuard";
+import { checkFormSubmission } from "@/lib/formProtection";
+import { getPropertiesByIds } from "@/lib/propertiesCache";
 import {
     addRepeatEnquiryNote,
     PUBLIC_SUCCESS_MESSAGE,
 } from "@/lib/repeatEnquiry";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-const ACCOUNTS_URL = "https://accounts.zoho.in";
-const DEFAULT_API_URL = "https://www.zohoapis.in";
-const CLIENT_ID = process.env.ZOHO_CLIENT_ID;
-const CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET;
-const REFRESH_TOKEN = process.env.ZOHO_REFRESH_TOKEN;
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_BODY_SIZE = 50000;
+const MAX_SELECTED_PROPERTIES = 20;
 const INTERESTED_PROPERTIES_SUBFORM = "Interested_Properties";
 const PROPERTY_LOOKUP_FIELD = "Property_Name";
 const MAX_LENGTHS = Object.freeze({
@@ -32,33 +40,7 @@ const MAX_LENGTHS = Object.freeze({
     requirementType: 100,
     message: 32000,
 });
-const globalZohoState = globalThis.__ANAROCK_ZOHO_AUTH_STATE || {
-    tokenCache: {
-        accessToken: null,
-        expiresAt: 0,
-        apiDomain: DEFAULT_API_URL,
-    },
-    refreshPromise: null,
-    authFailureUntil: 0,
-    cityCache: null,
-    cityCacheExpiresAt: 0,
-    cityCachePromise: null,
-};
-globalThis.__ANAROCK_ZOHO_AUTH_STATE = globalZohoState;
-function createRequestId() {
-    try {
-        return crypto.randomUUID();
-    } catch {
-        return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
-}
 
-function normalizeText(value) {
-    return String(value ?? "")
-        .normalize("NFKC")
-        .trim()
-        .replace(/\s+/g, " ");
-}
 
 function validateLength(value, max, field) {
     if (String(value || "").length > max) {
@@ -74,395 +56,34 @@ function validateLength(value, max, field) {
     return value;
 }
 
-function normalizePhone(value) {
-    return String(value || "")
-        .trim()
-        .replace(/[^\d+]/g, "");
-}
 
-function isValidPhone(value) {
-    return /^\+?[1-9]\d{7,14}$/.test(value);
-}
 
-function isValidEmail(value) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
-}
 
-function normalizeCityName(value) {
-    return normalizeText(value);
-}
 
-function isValidCityName(value) {
-    if (!value) {
-        return false;
-    }
-
-    return /^[\p{L}\p{N} .'-]{1,100}$/u.test(value);
-}
 
 /* -------------------------------------------------------------------------- */
 /* Rate Limiting                                                              */
 /* -------------------------------------------------------------------------- */
 
-const localRateLimitState = globalThis.__ANAROCK_LEADS_RATE_LIMIT || new Map();
-
-globalThis.__ANAROCK_LEADS_RATE_LIMIT = localRateLimitState;
-
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-
-const RATE_LIMIT_MAX_REQUESTS = 10;
-
-function getClientIdentifier(request) {
-    return getClientIp(request);
-}
-
-function checkRateLimit(request) {
-    const identifier = getClientIdentifier(request);
-
-    const now = Date.now();
-
-    const existing = localRateLimitState.get(identifier);
-
-    if (!existing || now - existing.windowStart >= RATE_LIMIT_WINDOW_MS) {
-        localRateLimitState.set(identifier, {
-            count: 1,
-            windowStart: now,
-        });
-
-        return {
-            allowed: true,
-            retryAfter: 60,
-        };
-    }
-
-    if (existing.count >= RATE_LIMIT_MAX_REQUESTS) {
-        const retryAfter = Math.max(
-            1,
-            Math.ceil((RATE_LIMIT_WINDOW_MS - (now - existing.windowStart)) / 1000),
-        );
-
-        return {
-            allowed: false,
-            retryAfter,
-        };
-    }
-
-    existing.count += 1;
-
-    return {
-        allowed: true,
-        retryAfter: 60,
-    };
-}
+const checkRateLimit = createRateLimiter({
+    name: "lead3",
+    windowMs: 60 * 1000,
+    max: 10,
+});
 
 /* -------------------------------------------------------------------------- */
 /* Zoho Authentication                                                        */
 /* -------------------------------------------------------------------------- */
 
-async function generateZohoAccessToken() {
-    if (
-        globalZohoState.authFailureUntil &&
-        Date.now() < globalZohoState.authFailureUntil
-    ) {
-        const waitSeconds = Math.ceil(
-            (globalZohoState.authFailureUntil - Date.now()) / 1000,
-        );
 
-        const error = new Error(
-            `Zoho authentication is temporarily rate limited. Please wait approximately ${waitSeconds} seconds.`,
-        );
-
-        error.code = "ZOHO_AUTH_RATE_LIMITED";
-
-        error.httpStatus = 429;
-
-        throw error;
-    }
-
-    if (globalZohoState.refreshPromise) {
-        return await globalZohoState.refreshPromise;
-    }
-
-    globalZohoState.refreshPromise = (async () => {
-        try {
-            if (!CLIENT_ID) {
-                throw new Error("ZOHO_CLIENT_ID is missing from .env.local");
-            }
-
-            if (!CLIENT_SECRET) {
-                throw new Error("ZOHO_CLIENT_SECRET is missing from .env.local");
-            }
-
-            if (!REFRESH_TOKEN) {
-                throw new Error("ZOHO_REFRESH_TOKEN is missing from .env.local");
-            }
-
-            const tokenUrl = `${ACCOUNTS_URL.replace(/\/$/, "")}/oauth/v2/token`;
-            const params = new URLSearchParams();
-            params.set("refresh_token", REFRESH_TOKEN.trim());
-            params.set("client_id", CLIENT_ID.trim());
-            params.set("client_secret", CLIENT_SECRET.trim());
-            params.set("grant_type", "refresh_token");
-            const response = await fetch(tokenUrl, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: params.toString(),
-                cache: "no-store",
-
-                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-            });
-            const responseText = await response.text();
-            let data = {};
-            try {
-                data = responseText ? JSON.parse(responseText) : {};
-            } catch {
-                throw new Error("Zoho OAuth returned an invalid response.");
-            }
-            if (
-                response.status === 429 ||
-                String(data?.error || data?.error_description || "")
-                    .toLowerCase()
-                    .includes("too many requests")
-            ) {
-                globalZohoState.authFailureUntil = Date.now() + 5 * 60 * 1000;
-                const error = new Error("Zoho OAuth rate limit reached.");
-                error.code = "ZOHO_AUTH_RATE_LIMITED";
-                error.httpStatus = 429;
-                throw error;
-            }
-            if (!response.ok) {
-                const error = new Error(
-                    data?.error_description ||
-                    data?.error ||
-                    "Unable to authenticate with Zoho CRM.",
-                );
-                error.code = "ZOHO_AUTH_FAILED";
-
-                error.httpStatus = response.status;
-                throw error;
-            }
-            if (!data?.access_token) {
-                throw new Error("Zoho did not return an access token.");
-            }
-            const accessToken = data.access_token;
-            const expiresInSeconds = Number(data.expires_in) || 3600;
-            const refreshAfterMilliseconds = Math.min(
-                59 * 60 * 1000,
-                Math.max(60, expiresInSeconds - 60) * 1000,
-            );
-            const apiDomain = String(data.api_domain || DEFAULT_API_URL).replace(
-                /\/$/,
-                "",
-            );
-            const tokenInfo = {
-                accessToken,
-                expiresAt: Date.now() + refreshAfterMilliseconds,
-                apiDomain,
-            };
-            globalZohoState.tokenCache = tokenInfo;
-            globalZohoState.authFailureUntil = 0;
-            return tokenInfo;
-        } finally {
-            globalZohoState.refreshPromise = null;
-        }
-    })();
-
-    return await globalZohoState.refreshPromise;
-}
-
-async function getZohoAccessToken(forceRefresh = false) {
-    if (
-        !forceRefresh &&
-        globalZohoState.tokenCache?.accessToken &&
-        globalZohoState.tokenCache?.expiresAt > Date.now()
-    ) {
-        return globalZohoState.tokenCache;
-    }
-
-    return await generateZohoAccessToken();
-}
 
 /* -------------------------------------------------------------------------- */
 /* City Directory                                                             */
 /* -------------------------------------------------------------------------- */
 
-async function loadCityDirectory(tokenInfo) {
-    const cityMap = new Map();
 
-    const perPage = 200;
 
-    for (let page = 1; page <= 10; page += 1) {
-        const params = new URLSearchParams();
 
-        params.set("fields", "id,Name");
-
-        params.set("per_page", String(perPage));
-
-        params.set("page", String(page));
-
-        const url = `${tokenInfo.apiDomain}/crm/v8/City?${params.toString()}`;
-
-        const response = await fetch(url, {
-            method: "GET",
-
-            headers: {
-                Authorization: `Zoho-oauthtoken ${tokenInfo.accessToken}`,
-
-                "Content-Type": "application/json",
-            },
-
-            cache: "no-store",
-
-            signal: AbortSignal.timeout(8000),
-        });
-
-        if (response.status === 401) {
-            const error = new Error("Zoho access token expired.");
-
-            error.code = "ZOHO_ACCESS_TOKEN_EXPIRED";
-
-            throw error;
-        }
-
-        if (!response.ok) {
-            return cityMap;
-        }
-
-        const responseText = await response.text();
-
-        let data = {};
-
-        try {
-            data = responseText ? JSON.parse(responseText) : {};
-        } catch {
-            return cityMap;
-        }
-
-        const records = Array.isArray(data?.data) ? data.data : [];
-
-        for (const record of records) {
-            const id = record?.id;
-
-            const name = normalizeCityName(record?.Name);
-
-            if (!id || !name) {
-                continue;
-            }
-
-            cityMap.set(name.toLowerCase(), String(id));
-        }
-
-        if (records.length < perPage) {
-            break;
-        }
-    }
-
-    return cityMap;
-}
-
-async function getCityDirectory(tokenInfo) {
-    if (
-        globalZohoState.cityCache &&
-        globalZohoState.cityCacheExpiresAt > Date.now()
-    ) {
-        return globalZohoState.cityCache;
-    }
-
-    if (globalZohoState.cityCachePromise) {
-        return await globalZohoState.cityCachePromise;
-    }
-
-    globalZohoState.cityCachePromise = (async () => {
-        try {
-            const cityMap = await loadCityDirectory(tokenInfo);
-
-            globalZohoState.cityCache = cityMap;
-
-            globalZohoState.cityCacheExpiresAt = Date.now() + 15 * 60 * 1000;
-
-            return cityMap;
-        } finally {
-            globalZohoState.cityCachePromise = null;
-        }
-    })();
-
-    return await globalZohoState.cityCachePromise;
-}
-
-async function findCityId(tokenInfo, cityName) {
-    const cleanCity = normalizeCityName(cityName);
-
-    if (!cleanCity || !isValidCityName(cleanCity)) {
-        return null;
-    }
-
-    const cityDirectory = await getCityDirectory(tokenInfo);
-
-    return cityDirectory.get(cleanCity.toLowerCase()) || null;
-}
-
-function mapLocationToLeadOwnerTeam(city, state) {
-    const cityLower = String(city || "")
-        .trim()
-        .toLowerCase();
-
-    const stateLower = String(state || "")
-        .trim()
-        .toLowerCase();
-
-    if (cityLower.includes("bengaluru") || cityLower.includes("bangalore")) {
-        return "Bengaluru";
-    }
-
-    if (cityLower.includes("chennai")) {
-        return "Chennai";
-    }
-
-    if (cityLower.includes("hyderabad")) {
-        return "Hyderabad";
-    }
-
-    if (cityLower.includes("kolkata")) {
-        return "Kolkata";
-    }
-
-    if (cityLower.includes("pune")) {
-        return "Pune";
-    }
-
-    if (
-        cityLower.includes("mumbai") ||
-        cityLower.includes("ahmedabad") ||
-        cityLower.includes("surat") ||
-        cityLower.includes("jaipur") ||
-        stateLower.includes("maharashtra") ||
-        stateLower.includes("gujarat") ||
-        stateLower.includes("goa") ||
-        stateLower.includes("rajasthan")
-    ) {
-        return "West";
-    }
-
-    if (
-        cityLower.includes("agra") ||
-        cityLower.includes("delhi") ||
-        cityLower.includes("noida") ||
-        cityLower.includes("gurugram") ||
-        cityLower.includes("gurgaon") ||
-        cityLower.includes("chandigarh") ||
-        stateLower.includes("delhi") ||
-        stateLower.includes("haryana") ||
-        stateLower.includes("punjab") ||
-        stateLower.includes("uttar pradesh") ||
-        stateLower.includes("uttarakhand")
-    ) {
-        return "North";
-    }
-
-    return "Platform";
-}
 
 function buildInterestedProperties(selectedProperties) {
     if (!Array.isArray(selectedProperties)) {
@@ -477,7 +98,7 @@ function buildInterestedProperties(selectedProperties) {
             continue;
         }
         if (!/^\d+$/.test(id)) {
-            console.warn("[SHORTLIST] Invalid CRM Property ID:", id);
+            logger.warn("[SHORTLIST] Invalid CRM Property ID:", id);
             continue;
         }
         if (seenIds.has(id)) {
@@ -519,7 +140,7 @@ async function createLeadInCRM(tokenInfo, recordData) {
         throw error;
     }
 
-    console.log("[ZOHO CRM] HTTP STATUS:", response.status);
+    logger.info("[ZOHO CRM] HTTP STATUS:", response.status);
     if (response.status === 401) {
         const error = new Error("Zoho access token expired.");
         error.code = "ZOHO_ACCESS_TOKEN_EXPIRED";
@@ -544,7 +165,7 @@ async function createLeadInCRM(tokenInfo, recordData) {
             ));
 
     if (isDuplicate) {
-        console.log("[ZOHO CRM] Duplicate Lead detected.");
+        logger.info("[ZOHO CRM] Duplicate Lead detected.");
         const duplicateErrors = Array.isArray(zohoResult?.details?.errors)
             ? zohoResult.details.errors
             : [];
@@ -612,7 +233,7 @@ async function createLeadInCRM(tokenInfo, recordData) {
         throw error;
     }
     const leadId = result?.details?.id || null;
-    console.log("[ZOHO CRM] New Lead created successfully:", leadId);
+    logger.info("[ZOHO CRM] New Lead created successfully:", leadId);
     return {
         success: true,
         duplicate: false,
@@ -625,7 +246,7 @@ async function createLeadInCRM(tokenInfo, recordData) {
 export async function POST(request) {
     const requestId = createRequestId();
     try {
-        const rateLimit = checkRateLimit(request);
+        const rateLimit = await checkRateLimit(request);
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 {
@@ -641,34 +262,30 @@ export async function POST(request) {
                 },
             );
         }
-        const contentLength = Number(request.headers.get("content-length") || 0);
-        if (contentLength > MAX_BODY_SIZE) {
+        const parsed = await readJsonBody(request, MAX_BODY_SIZE);
+        if (!parsed.ok) {
             return NextResponse.json(
-                {
-                    success: false,
-                    message: "Request is too large.",
-                    requestId,
-                },
-                {
-                    status: 413,
-                },
+                { success: false, message: parsed.message, requestId },
+                { status: parsed.status },
             );
         }
-        const contentType = request.headers.get("content-type") || "";
-        if (!contentType.toLowerCase().includes("application/json")) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: "Invalid request format.",
+
+        const body = parsed.data;
+        const guard = await checkFormSubmission(request, body);
+        if (!guard.ok) {
+            return guard.silent
+                ? NextResponse.json({
+                    success: true,
+                    message: PUBLIC_SUCCESS_MESSAGE,
                     requestId,
-                },
-                {
-                    status: 415,
-                },
-            );
+                })
+                : NextResponse.json(
+                    { success: false, message: guard.message, code: guard.code, requestId },
+                    { status: guard.status },
+                );
         }
-        const body = await request.json();
-        console.log(
+
+        logger.info(
             "[ENQUIRY] Request received:",
             JSON.stringify(
                 {
@@ -686,10 +303,32 @@ export async function POST(request) {
             ),
         );
         const selectedProperties = Array.isArray(body?.selectedProperties)
-            ? body.selectedProperties
+            ? body.selectedProperties.slice(0, MAX_SELECTED_PROPERTIES)
             : [];
-        const interestedProperties = buildInterestedProperties(selectedProperties);
-        console.log(
+        // The browser sends website property IDs. The CRM record of each
+        // property is looked up here, so CRM IDs are never sent to the browser.
+        const websiteIds = [
+            ...new Set(
+                selectedProperties
+                    .map((property) => String(property?.id ?? "").trim())
+                    .filter((id) => /^\d{1,30}$/.test(id)),
+            ),
+        ];
+        const knownProperties = websiteIds.length
+            ? await getPropertiesByIds(websiteIds)
+            : [];
+        const interestedProperties = buildInterestedProperties(
+            knownProperties
+                .filter((property) => property?.crmID)
+                .map((property) => ({ id: property.crmID })),
+        );
+        const propertyLines = knownProperties.map((property) => {
+            const place = [property.micromarket, property.city]
+                .filter(Boolean)
+                .join(", ");
+            return `- ${normalizeText(property.name) || "Property"}${place ? ` (${normalizeText(place)})` : ""}, website ID ${property.id}${property.crmID ? "" : ", not linked to a CRM property"}`;
+        });
+        logger.info(
             "[ENQUIRY] Interested properties:",
             interestedProperties.length,
         );
@@ -791,7 +430,7 @@ export async function POST(request) {
             location?.displayName ||
             [addressCity, state, country].filter(Boolean).join(", "),
         );
-        console.log("[ENQUIRY] Location received:", {
+        logger.info("[ENQUIRY] Location received:", {
             requestId,
             hasLocation: Boolean(detectedLocation),
         });
@@ -893,13 +532,13 @@ export async function POST(request) {
             );
         }
 
-        if (interestedProperties.length === 0) {
+        if (knownProperties.length === 0) {
             return NextResponse.json(
                 {
                     success: false,
                     message:
-                        "The selected properties do not contain valid Zoho CRM Property IDs.",
-                    errorCode: "PROPERTY_ID_MISSING",
+                        "The selected properties are no longer available. Please refresh the page and try again.",
+                    errorCode: "PROPERTY_NOT_FOUND",
                     requestId,
                 },
                 {
@@ -908,26 +547,6 @@ export async function POST(request) {
             );
         }
 
-        const uniqueFrontendIds = new Set(
-            selectedProperties
-                .map((property) => String(property?.id ?? "").trim())
-                .filter(Boolean),
-        );
-
-        if (interestedProperties.length !== uniqueFrontendIds.size) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message:
-                        "One or more selected properties have an invalid Zoho CRM Property ID.",
-                    errorCode: "INVALID_PROPERTY_ID",
-                    requestId,
-                },
-                {
-                    status: 400,
-                },
-            );
-        }
         let tokenInfo = await getZohoAccessToken();
         const processLead = async (currentToken) => {
             let requirementCityId = null;
@@ -950,7 +569,9 @@ export async function POST(request) {
                 Zip_Code: pincode || undefined,
                 Requirement_Type: requirementType || undefined,
                 Requirement_Details: requirementDetails || undefined,
-                [INTERESTED_PROPERTIES_SUBFORM]: interestedProperties,
+                [INTERESTED_PROPERTIES_SUBFORM]: interestedProperties.length
+                    ? interestedProperties
+                    : undefined,
             };
 
             if (email) {
@@ -963,7 +584,9 @@ export async function POST(request) {
                 };
             }
 
-            const descriptionParts = [];
+            const descriptionParts = [
+                `Properties enquired about:\n${propertyLines.join("\n")}`,
+            ];
 
             if (requirementCity) {
                 descriptionParts.push(
@@ -1044,7 +667,7 @@ export async function POST(request) {
             );
         } catch (error) {
             if (error?.code === "ZOHO_ACCESS_TOKEN_EXPIRED") {
-                console.warn("[ZOHO AUTH] Access token expired. Refreshing once...");
+                logger.warn("[ZOHO AUTH] Access token expired. Refreshing once...");
                 tokenInfo = await getZohoAccessToken(true);
                 await processLead(tokenInfo);
                 return NextResponse.json(
@@ -1062,7 +685,7 @@ export async function POST(request) {
             throw error;
         }
     } catch (error) {
-        console.error("[API] LEAD CREATION ERROR", {
+        logger.error("[API] LEAD CREATION ERROR", {
             requestId,
             code: error?.code || "UNKNOWN_ERROR",
             message: error?.message || "Unknown error",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getZohoAccessToken, zohoFetch } from "@/lib/zoho";
 import { getOrFetchCache } from "@/lib/cache";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ async function fetchAllMicromarkets() {
   const response = await zohoFetch(url, { method: "GET" });
 
   if (!response.ok) {
-    console.error("[Micromarkets API] Zoho request failed:", {
+    logger.error("[Micromarkets API] Zoho request failed:", {
       status: response.status,
     });
 
@@ -109,7 +110,7 @@ export async function GET(request) {
       },
     );
   } catch (error) {
-    console.error("[Micromarkets API] Failed:", {
+    logger.error("[Micromarkets API] Failed:", {
       code: error?.message || "UNKNOWN_ERROR",
       status: error?.status || null,
     });

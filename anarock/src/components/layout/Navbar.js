@@ -19,6 +19,12 @@ import { useWishlist } from "@/lib/wishlist";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import LocationControl from "@/components/common/LocationControl";
+import PrivacyNotice from "@/components/common/PrivacyNotice";
+import {
+  SECURITY_CHECK_MESSAGE,
+  useFormGuard,
+} from "@/components/common/FormGuard";
+import { PHONE_COUNTRIES as phoneCountries } from "@/lib/phoneCountries";
 
 const CURRENCY_CONFIG = {
   INR: { symbol: "₹", rate: 1, label: "₹  INR" },
@@ -41,90 +47,6 @@ const currencies = [
   ["SGD", "S$ SGD"],
 ];
 
-const phoneCountries = [
-  { name: "India", code: "IN", dial: "+91", flag: "🇮🇳", min: 10, max: 10 },
-  {
-    name: "United States",
-    code: "US",
-    dial: "+1",
-    flag: "🇺🇸",
-    min: 10,
-    max: 10,
-  },
-  { name: "Canada", code: "CA", dial: "+1", flag: "🇨🇦", min: 10, max: 10 },
-  {
-    name: "United Kingdom",
-    code: "GB",
-    dial: "+44",
-    flag: "🇬🇧",
-    min: 10,
-    max: 10,
-  },
-  {
-    name: "United Arab Emirates",
-    code: "AE",
-    dial: "+971",
-    flag: "🇦🇪",
-    min: 9,
-    max: 9,
-  },
-  { name: "Australia", code: "AU", dial: "+61", flag: "🇦🇺", min: 9, max: 9 },
-  { name: "Singapore", code: "SG", dial: "+65", flag: "🇸🇬", min: 8, max: 8 },
-  { name: "Germany", code: "DE", dial: "+49", flag: "🇩🇪", min: 10, max: 11 },
-  { name: "France", code: "FR", dial: "+33", flag: "🇫🇷", min: 9, max: 9 },
-  { name: "Italy", code: "IT", dial: "+39", flag: "🇮🇹", min: 9, max: 10 },
-  { name: "Spain", code: "ES", dial: "+34", flag: "🇪🇸", min: 9, max: 9 },
-  { name: "Netherlands", code: "NL", dial: "+31", flag: "🇳🇱", min: 9, max: 9 },
-  { name: "Switzerland", code: "CH", dial: "+41", flag: "🇨🇭", min: 9, max: 9 },
-  { name: "Ireland", code: "IE", dial: "+353", flag: "🇮🇪", min: 9, max: 9 },
-  { name: "New Zealand", code: "NZ", dial: "+64", flag: "🇳🇿", min: 8, max: 10 },
-  { name: "Japan", code: "JP", dial: "+81", flag: "🇯🇵", min: 10, max: 10 },
-  { name: "South Korea", code: "KR", dial: "+82", flag: "🇰🇷", min: 9, max: 10 },
-  { name: "China", code: "CN", dial: "+86", flag: "🇨🇳", min: 11, max: 11 },
-  { name: "Hong Kong", code: "HK", dial: "+852", flag: "🇭🇰", min: 8, max: 8 },
-  { name: "Malaysia", code: "MY", dial: "+60", flag: "🇲🇾", min: 9, max: 10 },
-  { name: "Thailand", code: "TH", dial: "+66", flag: "🇹🇭", min: 9, max: 9 },
-  { name: "Israel", code: "IL", dial: "+972", flag: "🇮🇱", min: 9, max: 9 },
-  { name: "Indonesia", code: "ID", dial: "+62", flag: "🇮🇩", min: 9, max: 12 },
-  {
-    name: "Philippines",
-    code: "PH",
-    dial: "+63",
-    flag: "🇵🇭",
-    min: 10,
-    max: 10,
-  },
-  { name: "Vietnam", code: "VN", dial: "+84", flag: "🇻🇳", min: 9, max: 10 },
-  { name: "South Africa", code: "ZA", dial: "+27", flag: "🇿🇦", min: 9, max: 9 },
-  {
-    name: "Saudi Arabia",
-    code: "SA",
-    dial: "+966",
-    flag: "🇸🇦",
-    min: 9,
-    max: 9,
-  },
-  { name: "Qatar", code: "QA", dial: "+974", flag: "🇶🇦", min: 8, max: 8 },
-  { name: "Kuwait", code: "KW", dial: "+965", flag: "🇰🇼", min: 8, max: 8 },
-  { name: "Oman", code: "OM", dial: "+968", flag: "🇴🇲", min: 8, max: 8 },
-  { name: "Bahrain", code: "BH", dial: "+973", flag: "🇧🇭", min: 8, max: 8 },
-  { name: "Pakistan", code: "PK", dial: "+92", flag: "🇵🇰", min: 10, max: 10 },
-  {
-    name: "Bangladesh",
-    code: "BD",
-    dial: "+880",
-    flag: "🇧🇩",
-    min: 10,
-    max: 10,
-  },
-  { name: "Nepal", code: "NP", dial: "+977", flag: "🇳🇵", min: 10, max: 10 },
-  { name: "Sri Lanka", code: "LK", dial: "+94", flag: "🇱🇰", min: 9, max: 9 },
-  { name: "Russia", code: "RU", dial: "+7", flag: "🇷🇺", min: 10, max: 10 },
-  { name: "Brazil", code: "BR", dial: "+55", flag: "🇧🇷", min: 10, max: 11 },
-  { name: "Mexico", code: "MX", dial: "+52", flag: "🇲🇽", min: 10, max: 10 },
-  { name: "Argentina", code: "AR", dial: "+54", flag: "🇦🇷", min: 10, max: 11 },
-  { name: "Turkey", code: "TR", dial: "+90", flag: "🇹🇷", min: 10, max: 10 },
-];
 
 const navigation = [
   { label: "Properties", href: "/properties", type: "link" },
@@ -170,6 +92,8 @@ export default function Navbar() {
   const currencyLabel = CURRENCY_CONFIG[currencyCode]?.label || "₹  INR";
 
   const [enquiryOpen, setEnquiryOpen] = useState(false);
+  const enquiryGuard = useFormGuard();
+  const enquiryDialogRef = useRef(null);
   const [enquiryStep, setEnquiryStep] = useState(1);
   const [enquiryStatus, setEnquiryStatus] = useState("form");
   const [pendingLeadPayload, setPendingLeadPayload] = useState(null);
@@ -239,6 +163,7 @@ export default function Navbar() {
   };
 
   const openEnquiry = () => {
+    enquiryGuard.restart();
     setSubmitError("");
     setEmail("");
     setEmailError("");
@@ -361,6 +286,66 @@ export default function Navbar() {
       }
     };
   }, []);
+
+  // Keyboard focus stays inside the open enquiry dialog and returns to the
+  // button that opened it when the dialog closes.
+  useEffect(() => {
+    if (!enquiryOpen) return undefined;
+    const opener = document.activeElement;
+
+    const focusableItems = () => {
+      const dialog = enquiryDialogRef.current;
+      if (!dialog) return [];
+      return [
+        ...dialog.querySelectorAll(
+          'a[href], button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((item) => item.getClientRects().length > 0);
+    };
+
+    const handleTab = (event) => {
+      if (event.key !== "Tab") return;
+      const dialog = enquiryDialogRef.current;
+      const items = focusableItems();
+      if (!dialog || items.length === 0) return;
+
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+
+      if (!dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && (active === first || active === dialog)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleTab);
+    return () => {
+      document.removeEventListener("keydown", handleTab);
+      if (opener && typeof opener.focus === "function" && document.contains(opener)) {
+        opener.focus();
+      }
+    };
+  }, [enquiryOpen]);
+
+  // Move focus into the dialog when it opens and when its step changes.
+  useEffect(() => {
+    if (!enquiryOpen) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const dialog = enquiryDialogRef.current;
+      const field = dialog?.querySelector(
+        'form input:not([tabindex="-1"]):not([type="hidden"])',
+      );
+      (field || dialog)?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [enquiryOpen, enquiryStep, enquiryStatus]);
 
   useEffect(() => {
     if (!countryOpen) return;
@@ -527,6 +512,11 @@ export default function Navbar() {
   const submitLeadToCRM = async (email = "", company = "") => {
     if (!pendingLeadPayload || isSubmitting) return;
 
+    if (!enquiryGuard.ready) {
+      setSubmitError(SECURITY_CHECK_MESSAGE);
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError("");
     setEmailError("");
@@ -535,6 +525,7 @@ export default function Navbar() {
       ...pendingLeadPayload,
       email: email.trim(),
       company: company.trim(),
+      ...enquiryGuard.values(),
     };
 
     try {
@@ -562,6 +553,7 @@ export default function Navbar() {
         error?.message || "Something went wrong while creating the lead.",
       );
     } finally {
+      enquiryGuard.afterSubmit();
       setIsSubmitting(false);
     }
   };
@@ -1189,10 +1181,12 @@ export default function Navbar() {
           }}
         >
           <div
+            ref={enquiryDialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="enquiry-title"
-            className="relative flex max-h-[85dvh] w-full max-w-[580px] 2xl:max-w-[700px] flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/95 shadow-2xl backdrop-blur-2xl animate-[navbarPopup_280ms_cubic-bezier(0.16,1,0.3,1)]"
+            className="relative flex max-h-[85dvh] outline-none w-full max-w-[580px] 2xl:max-w-[700px] flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/95 shadow-2xl backdrop-blur-2xl animate-[navbarPopup_280ms_cubic-bezier(0.16,1,0.3,1)]"
           >
             <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-[#A054A0]/15 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-28 -left-24 h-56 w-56 rounded-full bg-[#A054A0]/10 blur-3xl" />
@@ -1220,7 +1214,7 @@ export default function Navbar() {
                   Thank you
                 </p>
 
-                <h2 className="max-w-[440px] text-[24px] font-bold tracking-[-0.02em] text-black sm:text-[27px] lg:text-[30px] 2xl:text-[32px]">
+                <h2 id="enquiry-title" className="max-w-[440px] text-[24px] font-bold tracking-[-0.02em] text-black sm:text-[27px] lg:text-[30px] 2xl:text-[32px]">
                   Your enquiry has been received
                 </h2>
 
@@ -1497,6 +1491,8 @@ export default function Navbar() {
                       </div>
                     )}
 
+                    <PrivacyNotice className="mt-4" />
+
                     <button
                       type="submit"
                       className="group relative mt-6 flex h-[48px] w-full items-center justify-center gap-2 overflow-hidden rounded-lg bg-[#A054A0] text-[15px] font-bold text-white shadow-md transition-all duration-200 hover:bg-[#8d478d] hover:shadow-lg active:scale-98 sm:h-[50px] sm:text-[15px] 2xl:h-[58px] 2xl:text-[17px]"
@@ -1586,6 +1582,8 @@ export default function Navbar() {
                       </div>
                     </div>
 
+                    {enquiryGuard.fields}
+
                     {submitError && (
                       <div
                         role="alert"
@@ -1594,6 +1592,8 @@ export default function Navbar() {
                         {submitError}
                       </div>
                     )}
+
+                    <PrivacyNotice className="mt-4" />
 
                     <div className="mt-6 gap-3 sm:flex-row">
                       <button

@@ -61,7 +61,7 @@ export default function Footer() {
         </div>
         <div className="h-px w-full bg-[#A054A0]" />
         <div className=" py-8 sm:py-9 md:py-10 lg:py-11">
-          <h3 className="text-[14px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[15px]">Disclaimer</h3>
+          <h2 className="text-[14px] font-semibold uppercase tracking-[0.08em] text-white sm:text-[15px]">Disclaimer</h2>
           <p className="mt-3 max-w-[1450px] text-[12px] leading-[1.7] text-white/80 min-[400px]:text-[13px] sm:mt-4 sm:text-[14px] sm:leading-[1.75]">The site and its contents is provided on an &quot;as is&quot; basis. Anarock Property Consultants Private Limited, its associate or
             subsidiary companies (collectively &quot;Anarock&quot;) expressly
             disclaims all warranties, including the warranties of
@@ -95,6 +95,8 @@ export default function Footer() {
               sm:text-[12px]
             "
           >
+            <FooterLegalLink href="/contact">Contact Us</FooterLegalLink>
+
             <FooterLegalLink href="/privacy-policy">
               Privacy Policy
             </FooterLegalLink>
@@ -121,6 +123,9 @@ function FooterLegalLink({ href, children }) {
     <Link
       href={href}
       className="
+        inline-flex
+        min-h-6
+        items-center
         whitespace-nowrap
         transition-colors
         duration-200

@@ -232,7 +232,7 @@ export default function TermsOfUsePage() {
     <>
       <LegalHero title="Terms of Use" />
 
-      <main className="w-full bg-white">
+      <div className="w-full bg-white">
         <div className="mx-auto w-full max-w-[1376px] px-4 pb-[56px] pt-[36px] sm:px-6 sm:pb-[64px] sm:pt-[44px] lg:pb-[4rem] lg:pt-[2.6rem]">
           <p className="mb-[24px] text-[16px] font-medium leading-[1.5] text-black sm:mb-[28px] sm:text-[17px] lg:text-[length:max(17px,0.95rem)]">
             {INTRO_TEXT}
@@ -261,7 +261,7 @@ export default function TermsOfUsePage() {
             ))}
           </div>
         </div>
-      </main>
+      </div>
     </>
   );
 }

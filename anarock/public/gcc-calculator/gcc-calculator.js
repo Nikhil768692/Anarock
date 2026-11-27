@@ -583,7 +583,7 @@ function drawRE(R){
   const O=occupancy(S), lr=LEASE[S.lease].r;
   const side=(k,o,title,sub,wsKey)=>`
     <div class="re-col">
-      <h4>${title}</h4><span class="re-sub">${sub}</span>
+      <h3>${title}</h3><span class="re-sub">${sub}</span>
       <div class="re-ctl">
         <label for="ws_${k}">Workplace model</label>
         <select id="ws_${k}">${Object.entries(WS).map(([w,v])=>

@@ -1,173 +1,19 @@
 import { NextResponse } from "next/server";
+import { toPublicProperties } from "@/lib/propertyMapper";
 import {
-  getPropertyCandidates,
   getPropertiesByIds,
   getPropertiesCacheInfo,
 } from "@/lib/propertiesCache";
+import {
+  MAX_PAGE_SIZE,
+  MAX_TARGET_IDS,
+  parsePositiveInteger,
+  queryProperties,
+} from "@/lib/propertyQuery";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const MAX_PAGE_SIZE = 50;
-const MAX_TARGET_IDS = 10;
-
-function normalize(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
-function normalizeMatch(value) {
-  return normalize(value).replace(/[^a-z0-9]/g, "");
-}
-
-function parseNumber(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
-  }
-
-  const cleaned = String(value)
-    .replace(/[,₹$€£\s]/g, "")
-    .trim();
-  if (!cleaned) return null;
-  const number = Number(cleaned);
-  return Number.isFinite(number) ? number : null;
-}
-
-function firstValue(property, keys) {
-  for (const key of keys) {
-    const value = property?.[key];
-    if (value !== undefined && value !== null && String(value).trim() !== "") {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-function propertyId(property) {
-  return String(property?.id ?? "").trim();
-}
-
-function propertyType(property) {
-  return normalizeMatch(firstValue(property, ["officeType"]));
-}
-
-function propertyCity(property) {
-  return normalizeMatch(firstValue(property, ["city"]));
-}
-
-function propertyMicromarket(property) {
-  return normalize(firstValue(property, ["micromarket"]))
-    .replace(/[_-]+/g, " ")
-    .replace(/[^\w\s/]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function propertyName(property) {
-  return String(firstValue(property, ["name"]) || "").trim();
-}
-function propertyPrice(property) {
-  const type = propertyType(property);
-  const managedOffice =
-    type.includes("managedoffice") || type.includes("coworking");
-  const keys = managedOffice ? ["monthlyCostPerSeat"] : ["quotedRent"];
-  return parseNumber(firstValue(property, keys));
-}
-
-function propertyArea(property) {
-  return parseNumber(firstValue(property, ["totalLeasableAreaAvailable"]));
-}
-function propertySeats(property) {
-  return parseNumber(firstValue(property, ["NoOfSeatsOffered"]));
-}
-
-function parsePositiveInteger(value, fallback, maximum = Infinity) {
-  const parsed = Number(value);
-  if (
-    value === null ||
-    value === undefined ||
-    String(value).trim() === "" ||
-    !Number.isFinite(parsed) ||
-    parsed < 1
-  ) {
-    return fallback;
-  }
-
-  return Math.min(Math.floor(parsed), maximum);
-}
-
-function sortProperties(properties, sort) {
-  const allowedSorts = new Set([
-    "budget_asc",
-    "budget_desc",
-    "area_asc",
-    "area_desc",
-    "seats_asc",
-    "seats_desc",
-    "name_asc",
-    "name_desc",
-  ]);
-
-  if (!allowedSorts.has(sort)) {
-    return properties;
-  }
-
-  const descending = sort.endsWith("_desc");
-  const isNameSort = sort.startsWith("name_");
-  function sortValue(property) {
-    if (isNameSort) return propertyName(property);
-    if (sort.startsWith("budget_")) {
-      return propertyPrice(property);
-    }
-    if (sort.startsWith("area_")) {
-      return propertyArea(property);
-    }
-    return propertySeats(property);
-  }
-
-  return [...properties].sort((a, b) => {
-    const aValue = sortValue(a);
-    const bValue = sortValue(b);
-    if (!isNameSort) {
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-    }
-    let comparison;
-    if (isNameSort) {
-      comparison = String(aValue).localeCompare(String(bValue), undefined, {
-        sensitivity: "base",
-        numeric: true,
-      });
-    } else {
-      comparison = aValue - bValue;
-    }
-
-    if (comparison !== 0) {
-      return descending ? -comparison : comparison;
-    }
-
-    return propertyId(a).localeCompare(propertyId(b), undefined, {
-      numeric: true,
-    });
-  });
-}
-
-function matchesMicromarkets(property, selectedMarkets) {
-  if (!selectedMarkets.length) return true;
-  const market = propertyMicromarket(property);
-  if (!market) return false;
-  return selectedMarkets.some(
-    (selected) => market === selected || market.includes(selected),
-  );
-}
 
 function cacheResponseHeaders(cacheInfo, count, total, noStore = false) {
   return {
@@ -194,9 +40,10 @@ export async function GET(request) {
     const minBudget = searchParams.get("minBudget") || "";
     const maxBudget = searchParams.get("maxBudget") || "";
     const area = searchParams.get("area") || "";
+    const maxArea = searchParams.get("maxArea") || "";
     const seats = searchParams.get("seats") || "";
+    const maxSeats = searchParams.get("maxSeats") || "";
     const sort = searchParams.get("sort") || "";
-    const prompt = searchParams.get("prompt") || "";
     const hasPagination =
       searchParams.has("page") ||
       searchParams.has("pageSize") ||
@@ -216,7 +63,7 @@ export async function GET(request) {
       ),
     ].slice(0, MAX_TARGET_IDS);
     if (requestedIds.length > 0) {
-      const data = await getPropertiesByIds(requestedIds);
+      const data = toPublicProperties(await getPropertiesByIds(requestedIds));
       const cacheInfo = getPropertiesCacheInfo();
       return NextResponse.json(
         {
@@ -246,97 +93,28 @@ export async function GET(request) {
       );
     }
 
-    const indexedType = type && normalize(type) !== "ai" ? type : "";
-    const selectedMarkets = [
-      ...new Set(
-        micromarket
-          .split(",")
-          .map((value) =>
-            value
-              .toLowerCase()
-              .replace(/[_-]+/g, " ")
-              .replace(/[^\w\s/]/g, "")
-              .replace(/\s+/g, " ")
-              .trim(),
-          )
-          .filter(Boolean),
-      ),
-    ];
-    let filtered = await getPropertyCandidates({
+    const result = await queryProperties({
       city,
-      type: indexedType,
-      micromarkets: [],
+      type,
+      micromarket,
+      minBudget,
+      maxBudget,
+      area,
+      maxArea,
+      seats,
+      maxSeats,
+      sort,
+      page,
+      pageSize,
+      paginate: hasPagination,
     });
-
-    if (selectedMarkets.length) {
-      filtered = filtered.filter((property) =>
-        matchesMicromarkets(property, selectedMarkets),
-      );
-    }
-
-    if (minBudget !== "") {
-      const minimum = parseNumber(minBudget);
-
-      if (minimum !== null && minimum >= 0) {
-        filtered = filtered.filter((property) => {
-          const price = propertyPrice(property);
-
-          return price !== null && price >= minimum;
-        });
-      }
-    }
-
-    if (maxBudget !== "") {
-      const maximum = parseNumber(maxBudget);
-
-      if (maximum !== null && maximum >= 0) {
-        filtered = filtered.filter((property) => {
-          const price = propertyPrice(property);
-
-          return price !== null && price <= maximum;
-        });
-      }
-    }
-
-    if (area !== "") {
-      const minimumArea = parseNumber(area);
-
-      if (minimumArea !== null && minimumArea >= 0) {
-        filtered = filtered.filter((property) => {
-          const value = propertyArea(property);
-
-          return value !== null && value >= minimumArea;
-        });
-      }
-    }
-
-    if (seats !== "") {
-      const minimumSeats = parseNumber(seats);
-
-      if (minimumSeats !== null && minimumSeats >= 0) {
-        filtered = filtered.filter((property) => {
-          const value = propertySeats(property);
-
-          return value !== null && value >= minimumSeats;
-        });
-      }
-    }
-
-    void prompt;
-
-    filtered = sortProperties(filtered, sort);
-
-    const total = filtered.length;
-    const totalPages = Math.ceil(total / pageSize);
-
-    const responseData = hasPagination
-      ? filtered.slice((page - 1) * pageSize, page * pageSize)
-      : filtered;
+    const { total } = result;
+    const responseData = result.data;
 
     const cacheInfo = getPropertiesCacheInfo();
     const durationMs = Date.now() - startedAt;
 
-    console.info("[Properties API]", {
+    logger.info("[Properties API]", {
       durationMs,
       city: city || null,
       type: type || null,
@@ -355,10 +133,10 @@ export async function GET(request) {
         success: true,
         data: responseData,
         total,
-        page: hasPagination ? page : 1,
-        pageSize: hasPagination ? pageSize : total,
-        totalPages: hasPagination ? totalPages : total ? 1 : 0,
-        hasMore: hasPagination && page < totalPages,
+        page: result.page,
+        pageSize: result.pageSize,
+        totalPages: result.totalPages,
+        hasMore: result.hasMore,
         cachedAt: cacheInfo.cachedAt,
         cache: {
           count: cacheInfo.count,
@@ -372,7 +150,7 @@ export async function GET(request) {
       },
     );
   } catch (error) {
-    console.error("[Properties API] Request failed:", {
+    logger.error("[Properties API] Request failed:", {
       message: error?.message || String(error),
       name: error?.name || null,
       code: error?.code || null,

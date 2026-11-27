@@ -1,6 +1,10 @@
 import PropertyDetailClient from "./PropertyDetailClient";
-import { getPropertyById } from "@/lib/propertiesCache";
-import { notFound } from "next/navigation";
+import { getAllProperties, getPropertyById } from "@/lib/propertiesCache";
+import { toPublicProperty } from "@/lib/propertyMapper";
+import { getCachedPropertyImages } from "@/lib/propertyImages";
+import { getRelatedProperties } from "@/lib/relatedProperties";
+import { notFound, permanentRedirect } from "next/navigation";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -45,7 +49,7 @@ async function resolveProperty(params) {
       name: getPropertyName(property, resolvedParams?.name),
     };
   } catch (error) {
-    console.error(
+    logger.error(
       "[Property Detail Page] Property lookup failed:",
       error?.message || error,
     );
@@ -63,7 +67,7 @@ export async function generateMetadata({ params }) {
 
   if (!property) {
     return {
-      title: "Property Not Found | Anarock",
+      title: "Property Not Found",
       robots: {
         index: false,
         follow: false,
@@ -85,7 +89,7 @@ export async function generateMetadata({ params }) {
     .join(" ");
 
   return {
-    title: `${name} | Commercial Property | Anarock`,
+    title: `${name} | Commercial Property`,
     description,
     keywords: [
       name,
@@ -132,12 +136,49 @@ export async function generateMetadata({ params }) {
   };
 }
 
+// A property that was re-created in the data store gets a new ID. Old links
+// still carry its name, so a unique name match is sent to the new address.
+async function findMovedProperty(params) {
+  const slug = createSlug((await params)?.name || "");
+  if (!slug || slug === "commercial-property") return null;
+
+  try {
+    const matches = (await getAllProperties()).filter(
+      (item) => createSlug(item?.name) === slug,
+    );
+    return matches.length === 1 ? matches[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function PropertyDetailPage({ params }) {
   const { id, property } = await resolveProperty(params);
 
   if (!property) {
+    const moved = await findMovedProperty(params);
+    if (moved?.id) {
+      permanentRedirect(
+        `/properties/${encodeURIComponent(moved.id)}/${createSlug(moved.name)}`,
+      );
+    }
     notFound();
   }
 
-  return <PropertyDetailClient propertyId={id} />;
+  // The page is rendered on the server with the property, its images and a
+  // few related properties, so the content is in the HTML (search engines and
+  // a faster first view). Image or related lookups that fail are left empty.
+  const [gallery, related] = await Promise.all([
+    getCachedPropertyImages(property).catch(() => []),
+    getRelatedProperties(property).catch(() => []),
+  ]);
+
+  return (
+    <PropertyDetailClient
+      propertyId={id}
+      initialProperty={toPublicProperty(property)}
+      initialGallery={Array.isArray(gallery) ? gallery : []}
+      initialRelated={related}
+    />
+  );
 }

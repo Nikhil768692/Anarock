@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 // A public form submission that matches an existing CRM Lead must never change
 // that Lead: the sender is anonymous and may not be the person on record.
 // The enquiry is attached to the Lead as a Note instead, so a person can check
@@ -170,7 +171,7 @@ export async function addRepeatEnquiryNote({
   }
 
   if (!response.ok || result?.status !== "success") {
-    console.error("[Repeat enquiry] Note not saved:", code || response.status);
+    logger.error("[Repeat enquiry] Note not saved:", code || response.status);
     throw failure("REPEAT_NOTE_FAILED");
   }
 

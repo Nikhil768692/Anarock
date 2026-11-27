@@ -1,19 +1,24 @@
-import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { getClientIp } from "@/lib/requestGuard";
+import { getZohoAccessToken } from "@/lib/zoho";
+import {
+  createRequestId,
+  normalizeText,
+  normalizePhone,
+  isValidPhone,
+  isValidEmail,
+  findCityId,
+  mapLocationToLeadOwnerTeam,
+} from "@/lib/leadCommon";
+import { createRateLimiter, readJsonBody } from "@/lib/requestGuard";
+import { checkFormSubmission } from "@/lib/formProtection";
 import {
   addRepeatEnquiryNote,
   PUBLIC_SUCCESS_MESSAGE,
 } from "@/lib/repeatEnquiry";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-const ACCOUNTS_URL = "https://accounts.zoho.in";
-const DEFAULT_API_URL = "https://www.zohoapis.in";
-const CLIENT_ID = process.env.ZOHO_CLIENT_ID;
-const CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET;
-const REFRESH_TOKEN = process.env.ZOHO_REFRESH_TOKEN;
 const REQUEST_TIMEOUT_MS = 10_000;
-const CITY_CACHE_TTL_MS = 15 * 60 * 1000;
 const MAX_BODY_SIZE = 50_000;
 const MAX_LENGTHS = Object.freeze({
   firstName: 80,
@@ -30,39 +35,9 @@ const MAX_LENGTHS = Object.freeze({
   requirementType: 100,
 });
 
-const globalZohoState = globalThis.__ANAROCK_ZOHO_AUTH_STATE || {
-  tokenCache: {
-    accessToken: null,
-    expiresAt: 0,
-    apiDomain: DEFAULT_API_URL,
-  },
 
-  refreshPromise: null,
 
-  authFailureUntil: 0,
 
-  cityCache: null,
-  cityCacheExpiresAt: 0,
-  cityCachePromise: null,
-};
-
-globalThis.__ANAROCK_ZOHO_AUTH_STATE = globalZohoState;
-
-let zohoTokenCache = globalZohoState.tokenCache;
-function createRequestId() {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
-}
-
-function normalizeText(value) {
-  return String(value ?? "")
-    .normalize("NFKC")
-    .trim()
-    .replace(/\s+/g, " ");
-}
 
 function validateLength(value, max, field) {
   if (String(value || "").length > max) {
@@ -74,29 +49,10 @@ function validateLength(value, max, field) {
   return value;
 }
 
-function normalizePhone(value) {
-  return String(value || "")
-    .trim()
-    .replace(/[^\d+]/g, "");
-}
 
-function isValidPhone(value) {
-  return /^\+?[1-9]\d{7,14}$/.test(value);
-}
 
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
-}
 
-function normalizeCityName(value) {
-  return normalizeText(value);
-}
 
-function isValidCityName(value) {
-  if (!value) return false;
-
-  return /^[\p{L}\p{N} .'-]{1,100}$/u.test(value);
-}
 
 function safePositiveNumber(value, { min = 0, max = 100000000 } = {}) {
   if (value === undefined || value === null || value === "") {
@@ -116,333 +72,16 @@ function safePositiveNumber(value, { min = 0, max = 100000000 } = {}) {
   return parsed;
 }
 
-const localRateLimitState = globalThis.__ANAROCK_LEADS_RATE_LIMIT || new Map();
-globalThis.__ANAROCK_LEADS_RATE_LIMIT = localRateLimitState;
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 10;
-function getClientIdentifier(request) {
-  return getClientIp(request);
-}
+const checkRateLimit = createRateLimiter({
+  name: "leads",
+  windowMs: 60 * 1000,
+  max: 10,
+});
 
-function checkRateLimit(request) {
-  const identifier = getClientIdentifier(request);
-  const now = Date.now();
 
-  const existing = localRateLimitState.get(identifier);
 
-  if (!existing || now - existing.windowStart >= RATE_LIMIT_WINDOW_MS) {
-    localRateLimitState.set(identifier, {
-      count: 1,
-      windowStart: now,
-    });
 
-    return {
-      allowed: true,
-      retryAfter: 60,
-    };
-  }
 
-  if (existing.count >= RATE_LIMIT_MAX_REQUESTS) {
-    const retryAfter = Math.max(
-      1,
-      Math.ceil((RATE_LIMIT_WINDOW_MS - (now - existing.windowStart)) / 1000),
-    );
-
-    return {
-      allowed: false,
-      retryAfter,
-    };
-  }
-
-  existing.count += 1;
-
-  return {
-    allowed: true,
-    retryAfter: 60,
-  };
-}
-
-async function generateZohoAccessToken() {
-  if (
-    globalZohoState.authFailureUntil &&
-    Date.now() < globalZohoState.authFailureUntil
-  ) {
-    const waitSeconds = Math.ceil(
-      (globalZohoState.authFailureUntil - Date.now()) / 1000,
-    );
-
-    const error = new Error(
-      `Zoho authentication is temporarily rate limited. Please wait approximately ${waitSeconds} seconds.`,
-    );
-
-    error.code = "ZOHO_AUTH_RATE_LIMITED";
-
-    error.httpStatus = 429;
-
-    throw error;
-  }
-
-  if (globalZohoState.refreshPromise) {
-    return await globalZohoState.refreshPromise;
-  }
-
-  globalZohoState.refreshPromise = (async () => {
-    try {
-      if (!CLIENT_ID) {
-        throw new Error("ZOHO_CLIENT_ID is missing from .env.local");
-      }
-      if (!CLIENT_SECRET) {
-        throw new Error("ZOHO_CLIENT_SECRET is missing from .env.local");
-      }
-      if (!REFRESH_TOKEN) {
-        throw new Error("ZOHO_REFRESH_TOKEN is missing from .env.local");
-      }
-      const tokenUrl = `${ACCOUNTS_URL}/oauth/v2/token`;
-      const params = new URLSearchParams();
-      params.set("refresh_token", REFRESH_TOKEN.trim());
-      params.set("client_id", CLIENT_ID.trim());
-      params.set("client_secret", CLIENT_SECRET.trim());
-      params.set("grant_type", "refresh_token");
-      const response = await fetch(tokenUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params.toString(),
-        cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      const responseText = await response.text();
-      let data;
-      try {
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch {
-        throw new Error("Zoho OAuth returned an invalid response.");
-      }
-      if (
-        response.status === 429 ||
-        String(data?.error || data?.error_description || "")
-          .toLowerCase()
-          .includes("too many requests")
-      ) {
-        globalZohoState.authFailureUntil = Date.now() + 5 * 60 * 1000;
-
-        const error = new Error("Zoho OAuth rate limit reached.");
-
-        error.code = "ZOHO_AUTH_RATE_LIMITED";
-
-        error.httpStatus = 429;
-
-        throw error;
-      }
-
-      if (!response.ok) {
-        const error = new Error("Unable to authenticate with Zoho CRM.");
-
-        error.code = "ZOHO_AUTH_FAILED";
-
-        error.httpStatus =
-          response.status >= 400 && response.status < 600
-            ? response.status
-            : 500;
-
-        throw error;
-      }
-
-      if (!data?.access_token) {
-        throw new Error("Zoho did not return an access token.");
-      }
-
-      const accessToken = data.access_token;
-
-      const expiresInSeconds = Number(data.expires_in) || 3600;
-
-      const refreshAfterMilliseconds = Math.min(
-        59 * 60 * 1000,
-        Math.max(60, expiresInSeconds - 60) * 1000,
-      );
-
-      const apiDomain = String(data.api_domain || DEFAULT_API_URL).replace(
-        /\/$/,
-        "",
-      );
-
-      zohoTokenCache = {
-        accessToken,
-        expiresAt: Date.now() + refreshAfterMilliseconds,
-        apiDomain,
-      };
-
-      globalZohoState.tokenCache = zohoTokenCache;
-
-      globalZohoState.authFailureUntil = 0;
-
-      return zohoTokenCache;
-    } finally {
-      globalZohoState.refreshPromise = null;
-    }
-  })();
-
-  return await globalZohoState.refreshPromise;
-}
-
-async function getZohoAccessToken(forceRefresh = false) {
-  if (
-    !forceRefresh &&
-    globalZohoState.tokenCache?.accessToken &&
-    globalZohoState.tokenCache?.expiresAt > Date.now()
-  ) {
-    return globalZohoState.tokenCache;
-  }
-
-  return await generateZohoAccessToken();
-}
-
-async function loadCityDirectory(tokenInfo) {
-  const cityMap = new Map();
-  const perPage = 200;
-  for (let page = 1; page <= 10; page += 1) {
-    const params = new URLSearchParams();
-    params.set("fields", "id,Name");
-    params.set("per_page", String(perPage));
-    params.set("page", String(page));
-    const url = `${tokenInfo.apiDomain}/crm/v8/City` + `?${params.toString()}`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Zoho-oauthtoken ${tokenInfo.accessToken}`,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
-    if (response.status === 401) {
-      const error = new Error("Zoho access token expired.");
-      error.code = "ZOHO_ACCESS_TOKEN_EXPIRED";
-      throw error;
-    }
-    if (!response.ok) {
-      return cityMap;
-    }
-    const responseText = await response.text();
-    let data;
-    try {
-      data = responseText ? JSON.parse(responseText) : {};
-    } catch {
-      return cityMap;
-    }
-
-    const records = Array.isArray(data?.data) ? data.data : [];
-    for (const record of records) {
-      const id = record?.id;
-      const name = normalizeCityName(record?.Name);
-      if (!id || !name) {
-        continue;
-      }
-      cityMap.set(name.toLowerCase(), String(id));
-    }
-    if (records.length < perPage) {
-      break;
-    }
-  }
-
-  return cityMap;
-}
-
-async function getCityDirectory(tokenInfo) {
-  if (
-    globalZohoState.cityCache &&
-    globalZohoState.cityCacheExpiresAt > Date.now()
-  ) {
-    return globalZohoState.cityCache;
-  }
-
-  if (globalZohoState.cityCachePromise) {
-    return await globalZohoState.cityCachePromise;
-  }
-
-  globalZohoState.cityCachePromise = (async () => {
-    try {
-      const cityMap = await loadCityDirectory(tokenInfo);
-      globalZohoState.cityCache = cityMap;
-      globalZohoState.cityCacheExpiresAt = Date.now() + CITY_CACHE_TTL_MS;
-      return cityMap;
-    } finally {
-      globalZohoState.cityCachePromise = null;
-    }
-  })();
-
-  return await globalZohoState.cityCachePromise;
-}
-
-async function findCityId(tokenInfo, cityName) {
-  const cleanCity = normalizeCityName(cityName);
-  if (!cleanCity || !isValidCityName(cleanCity)) {
-    return null;
-  }
-  const cityDirectory = await getCityDirectory(tokenInfo);
-  return cityDirectory.get(cleanCity.toLowerCase()) || null;
-}
-function mapLocationToLeadOwnerTeam(city, state) {
-  const cityLower = String(city || "")
-    .trim()
-    .toLowerCase();
-
-  const stateLower = String(state || "")
-    .trim()
-    .toLowerCase();
-
-  if (cityLower.includes("bengaluru") || cityLower.includes("bangalore")) {
-    return "Bengaluru";
-  }
-
-  if (cityLower.includes("chennai")) {
-    return "Chennai";
-  }
-
-  if (cityLower.includes("hyderabad")) {
-    return "Hyderabad";
-  }
-
-  if (cityLower.includes("kolkata")) {
-    return "Kolkata";
-  }
-
-  if (cityLower.includes("pune")) {
-    return "Pune";
-  }
-
-  if (
-    cityLower.includes("mumbai") ||
-    cityLower.includes("ahmedabad") ||
-    cityLower.includes("surat") ||
-    cityLower.includes("jaipur") ||
-    stateLower.includes("maharashtra") ||
-    stateLower.includes("gujarat") ||
-    stateLower.includes("goa") ||
-    stateLower.includes("rajasthan")
-  ) {
-    return "West";
-  }
-
-  if (
-    cityLower.includes("agra") ||
-    cityLower.includes("delhi") ||
-    cityLower.includes("noida") ||
-    cityLower.includes("gurugram") ||
-    cityLower.includes("gurgaon") ||
-    cityLower.includes("chandigarh") ||
-    stateLower.includes("delhi") ||
-    stateLower.includes("haryana") ||
-    stateLower.includes("punjab") ||
-    stateLower.includes("uttar pradesh") ||
-    stateLower.includes("uttarakhand")
-  ) {
-    return "North";
-  }
-
-  return "Platform";
-}
 
 async function createLeadInCRM(tokenInfo, recordData) {
   const url = `${tokenInfo.apiDomain}/crm/v8/Leads`;
@@ -586,7 +225,7 @@ async function createLeadInCRM(tokenInfo, recordData) {
 export async function POST(request) {
   const requestId = createRequestId();
   try {
-    const rateLimit = checkRateLimit(request);
+    const rateLimit = await checkRateLimit(request);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {
@@ -603,47 +242,27 @@ export async function POST(request) {
       );
     }
 
-    const contentLength = Number(request.headers.get("content-length") || 0);
-    if (contentLength > MAX_BODY_SIZE) {
+    const parsed = await readJsonBody(request, MAX_BODY_SIZE);
+    if (!parsed.ok) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Request is too large.",
-          requestId,
-        },
-        {
-          status: 413,
-        },
+        { success: false, message: parsed.message, requestId },
+        { status: parsed.status },
       );
     }
 
-    const contentType = request.headers.get("content-type") || "";
-
-    if (!contentType.toLowerCase().includes("application/json")) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid request format.",
-          requestId,
-        },
-        {
-          status: 415,
-        },
-      );
-    }
-
-    const body = await request.json();
-    if (body?.website) {
-      return NextResponse.json(
-        {
-          success: true,
-          message: PUBLIC_SUCCESS_MESSAGE,
-          requestId,
-        },
-        {
-          status: 200,
-        },
-      );
+    const body = parsed.data;
+    const guard = await checkFormSubmission(request, body);
+    if (!guard.ok) {
+      return guard.silent
+        ? NextResponse.json({
+            success: true,
+            message: PUBLIC_SUCCESS_MESSAGE,
+            requestId,
+          })
+        : NextResponse.json(
+            { success: false, message: guard.message, code: guard.code, requestId },
+            { status: guard.status },
+          );
     }
 
     const location = body?.location || {};
@@ -865,7 +484,7 @@ export async function POST(request) {
       throw error;
     }
   } catch (error) {
-    console.error("[API] LEAD CREATION ERROR", {
+    logger.error("[API] LEAD CREATION ERROR", {
       requestId,
       code: error?.code || "UNKNOWN_ERROR",
       status: error?.httpStatus || 500,
