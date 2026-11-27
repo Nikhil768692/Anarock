@@ -2,8 +2,14 @@
 import { useState, useEffect } from "react";
 import { Cookie, ArrowUpRight } from "lucide-react";
 import { clearStoredLocation } from "@/lib/userLocation";
+import { useStorageValue, writeStorageValue } from "@/lib/browserStore";
+const CONSENT_KEY = "cookie_consent_accepted";
+const CONSENT_EVENT = "cookie-consent-updated";
+
 export default function CookieConsent({ onConsentGiven }) {
-  const [show, setShow] = useState(false);
+  // undefined until the browser is known, null when no choice is saved yet.
+  const consent = useStorageValue(CONSENT_KEY, { events: [CONSENT_EVENT] });
+  const show = consent === null;
   const [view, setView] = useState("overview");
   const [preferences, setPreferences] = useState({
     essential: true,
@@ -11,23 +17,18 @@ export default function CookieConsent({ onConsentGiven }) {
     marketing: true,
     preferences: true,
   });
+
+  // Tell the page when a choice is already saved.
   useEffect(() => {
-    const consent = localStorage.getItem("cookie_consent_accepted");
-    if (!consent) {
-      setShow(true);
-    } else {
-      if (onConsentGiven) onConsentGiven();
-    }
-  }, [onConsentGiven]);
+    if (consent && onConsentGiven) onConsentGiven();
+  }, [consent, onConsentGiven]);
 
   const handleSave = (customPrefs) => {
     const finalPrefs = customPrefs || preferences;
-    localStorage.setItem("cookie_consent_accepted", "true");
-    localStorage.setItem("cookie_preferences", JSON.stringify(finalPrefs));
+    writeStorageValue("cookie_preferences", JSON.stringify(finalPrefs));
     // Rejecting optional storage also removes a saved location.
     if (!finalPrefs.preferences) clearStoredLocation();
-    setShow(false);
-    if (onConsentGiven) onConsentGiven();
+    writeStorageValue(CONSENT_KEY, "true", { event: CONSENT_EVENT });
   };
 
   const handleAcceptAll = () => {

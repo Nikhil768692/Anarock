@@ -718,15 +718,18 @@ export default function AboutUsPage() {
                                 className="flex h-[150px] items-center justify-center overflow-hidden rounded-sm border border-dashed border-slate-400 bg-white p-5 transition-all duration-300 hover:border-[#cda5c7] hover:shadow-sm sm:h-[170px]"
                             >
                                 {partner.IMG && (
-                                    <div className="flex h-[80px] w-[180px] items-center justify-center">
-                                        <img
+                                    <div
+                                        className="relative h-[80px] w-[180px]"
+                                        style={{
+                                            transform: `scale(${partner.scale || 1})`,
+                                        }}
+                                    >
+                                        <Image
                                             src={partner.IMG}
                                             alt={partner.name}
-                                            loading="lazy"
-                                            className="max-h-full max-w-full object-contain"
-                                            style={{
-                                                transform: `scale(${partner.scale || 1})`,
-                                            }}
+                                            fill
+                                            sizes="180px"
+                                            className="object-contain"
                                         />
                                     </div>
                                 )}

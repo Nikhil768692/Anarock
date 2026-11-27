@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -7,6 +7,7 @@ import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PrivacyNotice from "@/components/common/PrivacyNotice";
 import PropertyCard from "@/components/properties/PropertyCard";
 import { useWishlist } from "@/lib/wishlist";
+import { useCompareSelection } from "@/lib/compareSelection";
 import { fetchPropertiesByIds } from "@/lib/fetchPropertiesByIds";
 import {
   SECURITY_CHECK_MESSAGE,
@@ -29,7 +30,6 @@ import {
   Trash2,
   ExternalLink,
 } from "lucide-react";
-const COMPARE_STORAGE_KEY = "anarock_compare_properties";
 const MAX_COMPARE_PROPERTIES = 3;
 const MIN_COMPARE_PROPERTIES = 2;
 const IMAGE_BASE_URL = "https://property-images.zohostratus.in";
@@ -203,7 +203,7 @@ export default function WishlistClient() {
   // Shortlists already refreshed on this page. Saving the refreshed list
   // updates `items` again, so without this the refresh would run in a loop.
   const repairedSelectionKeysRef = useRef(new Set());
-  const [compareSelection, setCompareSelection] = useState([]);
+  const [storedCompare, setCompareSelection] = useCompareSelection({ keep: "last" });
   const [enquirySelection, setEnquirySelection] = useState([]);
   const [isEnquiryOpen, setIsEnquiryOpen] = useState(false);
   const enquiryGuard = useFormGuard();
@@ -270,39 +270,21 @@ export default function WishlistClient() {
       cancelled = true;
     };
   }, [isInitialized, items]);
+  // Only shortlisted properties can be compared on this page.
+  const compareSelection = useMemo(() => {
+    const shortlistedIds = new Set(items.map(getPropertyId).filter(Boolean));
+    return storedCompare.filter((property) =>
+      shortlistedIds.has(getPropertyId(property)),
+    );
+  }, [storedCompare, items]);
+
+  // Remove properties that left the shortlist from the saved comparison.
   useEffect(() => {
     if (!isInitialized) return;
-    try {
-      const saved = localStorage.getItem(COMPARE_STORAGE_KEY);
-      if (!saved || !items.length) {
-        setCompareSelection([]);
-        localStorage.removeItem(COMPARE_STORAGE_KEY);
-        return;
-      }
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) {
-        setCompareSelection([]);
-        localStorage.removeItem(COMPARE_STORAGE_KEY);
-        return;
-      }
-      const shortlistedIds = new Set(items.map(getPropertyId).filter(Boolean));
-      const validSelections = parsed
-        .filter((property) => {
-          const id = getPropertyId(property);
-          return id && shortlistedIds.has(id);
-        })
-        .slice(-MAX_COMPARE_PROPERTIES);
-      setCompareSelection(validSelections);
-      localStorage.setItem(
-        COMPARE_STORAGE_KEY,
-        JSON.stringify(validSelections),
-      );
-    } catch (error) {
-      console.error("[COMPARE] Failed to load compare selection:", error);
-      setCompareSelection([]);
-      localStorage.removeItem(COMPARE_STORAGE_KEY);
+    if (compareSelection.length !== storedCompare.length) {
+      setCompareSelection(compareSelection);
     }
-  }, [isInitialized, items]);
+  }, [isInitialized, compareSelection, storedCompare, setCompareSelection]);
 
   const handleCompareToggle = (property) => {
     const propertyId = getPropertyId(property);
@@ -314,14 +296,12 @@ export default function WishlistClient() {
       const updated = alreadySelected
         ? previous.filter((item) => getPropertyId(item) !== propertyId)
         : [...previous, property].slice(-MAX_COMPARE_PROPERTIES);
-      localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
   };
 
   const clearCompareSelection = () => {
     setCompareSelection([]);
-    localStorage.removeItem(COMPARE_STORAGE_KEY);
   };
   const clearShortlist = () => {
     if (!items.length) return;
@@ -330,7 +310,6 @@ export default function WishlistClient() {
     );
     if (!confirmed) return;
     localStorage.removeItem("anarock_wishlist_properties");
-    localStorage.removeItem(COMPARE_STORAGE_KEY);
     setCompareSelection([]);
     setEnquirySelection([]);
     setEnquirySubmittedSelectionKey("");
@@ -344,7 +323,7 @@ export default function WishlistClient() {
   const remainingToCompare = Math.max(0, MIN_COMPARE_PROPERTIES - compareSelection.length,);
   const openComparePage = () => {
     if (!canCompare) return;
-    localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(compareSelection));
+    setCompareSelection(compareSelection);
     router.push("/compare");
   };
 

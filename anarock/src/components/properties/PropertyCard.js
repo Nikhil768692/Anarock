@@ -126,12 +126,16 @@ function PropertyCard({
     getStratusImageCandidates(property?.ImageFolderPath, "Project_Picture_1.jpg"),
     [property?.ImageFolderPath]
   );
-  const imageUrl = imageCandidates[imageCandidateIndex] || "";
-  const imageError = imageCandidateIndex >= imageCandidates.length;
-  useEffect(() => {
+  // A different property starts again from its first image.
+  const imageKey = `${propertyId}|${imageCandidates.join("|")}`;
+  const [shownImageKey, setShownImageKey] = useState(imageKey);
+  if (shownImageKey !== imageKey) {
+    setShownImageKey(imageKey);
     setImageLoaded(false);
     setImageCandidateIndex(0);
-  }, [propertyId, imageCandidates.join("|")]);
+  }
+  const imageUrl = imageCandidates[imageCandidateIndex] || "";
+  const imageError = imageCandidateIndex >= imageCandidates.length;
   const handleImageError = () => {
     setImageLoaded(false);
     setImageCandidateIndex((current) => current + 1);

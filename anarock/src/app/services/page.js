@@ -449,22 +449,34 @@ function LocalImage({
   );
 }
 
+const SERVICE_SLUG_TO_INDEX = {
+  "leasing-services": 0,
+  "transaction-management": 1,
+      "advisory-services": 2,
+  "enterprise-advisory-solutions": 3,
+  // Older links used this name for the Enterprise Advisory Solutions tab.
+  "gcc-calculator": 3,
+};
+
 function CommercialLeasingAndAdvisoryPageContent() {
   const searchParams = useSearchParams();
 
-  const serviceSlugToIndex = {
-    "leasing-services": 0,
-    "transaction-management": 1,
-        "advisory-services": 2,
-    "enterprise-advisory-solutions": 3,
-    // Older links used this name for the Enterprise Advisory Solutions tab.
-    "gcc-calculator": 3,
-  };
   const requestedService = searchParams.get("service");
-  const [activeService, setActiveService] = useState(0);
+  const [activeService, setActiveService] = useState(
+    () => SERVICE_SLUG_TO_INDEX[requestedService] ?? 0,
+  );
+  // Only a ?service= link picks the tab here. Without it, keep the tab
+  // chosen from the navbar menu.
+  const [shownRequest, setShownRequest] = useState(requestedService);
+  if (requestedService !== shownRequest) {
+    setShownRequest(requestedService);
+    if (requestedService) {
+      setActiveService(SERVICE_SLUG_TO_INDEX[requestedService] ?? 0);
+    }
+  }
   useEffect(() => {
     const selectService = (slug) => {
-      const index = serviceSlugToIndex[slug];
+      const index = SERVICE_SLUG_TO_INDEX[slug];
       if (index === undefined) return;
       setActiveService(index);
       requestAnimationFrame(() => {
@@ -492,13 +504,6 @@ function CommercialLeasingAndAdvisoryPageContent() {
       window.removeEventListener("anarock-service-selected", handleSelection);
     };
   }, []);
-
-   useEffect(() => {
-    // Only a ?service= link picks the tab here. Without it, keep the tab
-    // chosen from the navbar menu (set by the effect above).
-    if (!requestedService) return;
-    setActiveService(serviceSlugToIndex[requestedService] ?? 0);
-  }, [requestedService]);
   const [openFaq, setOpenFaq] = useState(null);
   const [businessOffset, setBusinessOffset] = useState(0);
   const [researchOffset, setResearchOffset] = useState(0);

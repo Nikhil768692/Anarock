@@ -6,6 +6,10 @@ import PrivacyNotice from "@/components/common/PrivacyNotice";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PropertyCard from "@/components/properties/PropertyCard";
 import { usePreferences } from "@/lib/preferences";
+import {
+  MAX_COMPARE_PROPERTIES,
+  useCompareSelection,
+} from "@/lib/compareSelection";
 import { convertArea, convertCurrency } from "@/lib/format";
 import {
   SECURITY_CHECK_MESSAGE,
@@ -23,8 +27,7 @@ import {
 } from "lucide-react";
 import { PHONE_COUNTRIES } from "@/lib/phoneCountries";
 
-const COMPARE_STORAGE_KEY = "anarock_compare_properties";
-const MAX_COMPARE_PROPERTIES = 3;
+
 const MIN_COMPARE_PROPERTIES = 2;
 const PROPERTIES_TO_SHOW = 9;
 const MICROMARKETS_TO_SHOW = 6;
@@ -196,7 +199,7 @@ function getStoredUserLocation() {
 export default function CityPageClient({ city }) {
   const router = useRouter();
   const { currency, unit, exchangeRates } = usePreferences();
-  const [compareSelection, setCompareSelection] = useState([]);
+  const [compareSelection, setCompareSelection] = useCompareSelection();
   const [allProperties, setAllProperties] = useState([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
   const [propertyError, setPropertyError] = useState("");
@@ -283,34 +286,6 @@ export default function CityPageClient({ city }) {
     };
   }, [city]);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(COMPARE_STORAGE_KEY);
-      if (!saved) {
-        setCompareSelection([]);
-        return;
-      }
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) {
-        setCompareSelection([]);
-        return;
-      }
-      const validSelection = parsed
-        .filter((item) => getPropertyId(item))
-        .filter(
-          (item, index, array) =>
-            index ===
-            array.findIndex(
-              (candidate) => getPropertyId(candidate) === getPropertyId(item),
-            ),
-        )
-        .slice(0, MAX_COMPARE_PROPERTIES);
-      setCompareSelection(validSelection);
-    } catch (error) {
-      console.error("[CityPage] Failed to restore compare selection:", error);
-      setCompareSelection([]);
-    }
-  }, []);
 
   const visibleProperties = allProperties.slice(0, PROPERTIES_TO_SHOW);
 
@@ -375,26 +350,12 @@ export default function CityPageClient({ city }) {
         updatedSelection = [...currentSelection, property];
       }
 
-      try {
-        localStorage.setItem(
-          COMPARE_STORAGE_KEY,
-          JSON.stringify(updatedSelection),
-        );
-      } catch (error) {
-        console.error("[CityPage] Failed to save compare selection:", error);
-      }
-
       return updatedSelection;
     });
   };
 
   const clearCompareSelection = () => {
     setCompareSelection([]);
-    try {
-      localStorage.removeItem(COMPARE_STORAGE_KEY);
-    } catch (error) {
-      console.error("[CityPage] Failed to clear compare selection:", error);
-    }
   };
 
   const openComparePage = () => {
@@ -402,15 +363,6 @@ export default function CityPageClient({ city }) {
       compareSelection.length < MIN_COMPARE_PROPERTIES ||
       compareSelection.length > MAX_COMPARE_PROPERTIES
     ) {
-      return;
-    }
-    try {
-      localStorage.setItem(
-        COMPARE_STORAGE_KEY,
-        JSON.stringify(compareSelection),
-      );
-    } catch (error) {
-      console.error("[CityPage] Failed to save compare selection:", error);
       return;
     }
     router.push("/compare");
@@ -688,9 +640,11 @@ function AdvisorCard({ city, advisor, loading }) {
   // of a broken image.
   const photoUrl = advisor?.photoUrl || "";
   const [photoFailed, setPhotoFailed] = useState(false);
-  useEffect(() => {
+  const [shownPhotoUrl, setShownPhotoUrl] = useState(photoUrl);
+  if (shownPhotoUrl !== photoUrl) {
+    setShownPhotoUrl(photoUrl);
     setPhotoFailed(false);
-  }, [photoUrl]);
+  }
 
   if (loading) {
     return (
@@ -928,9 +882,11 @@ function RequirementForm({ city, micromarkets, unit }) {
   }, [countryOpen]);
 
   // Reset the chosen size when the unit changes, since the labels change.
-  useEffect(() => {
+  const [formUnit, setFormUnit] = useState(unit);
+  if (formUnit !== unit) {
+    setFormUnit(unit);
     setForm((previous) => ({ ...previous, size: "" }));
-  }, [unit]);
+  }
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });

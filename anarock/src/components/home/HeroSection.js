@@ -127,7 +127,7 @@ function TabButton({ active, onClick, icon: Icon, children }) {
   );
 }
 
-export default function HeroSection({ consentGranted, locationData }) {
+export default function HeroSection({ locationData }) {
   const router = useRouter();
   const [tab, setTab] = useState("filters");
   const [city, setCity] = useState("");
@@ -151,7 +151,6 @@ export default function HeroSection({ consentGranted, locationData }) {
   const cityDropdownRef = useRef(null);
   const micromarketDropdownRef = useRef(null);
   const officeTypeDropdownRef = useRef(null);
-  const locationAutoSelectedRef = useRef(false);
 
   const formatNumberWithCommas = (value) => {
     const rawValue = String(value || "").replace(/\D/g, "");
@@ -248,55 +247,57 @@ export default function HeroSection({ consentGranted, locationData }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (locationAutoSelectedRef.current) {
-      return;
-    }
-    if (!locationData?.city) {
-      return;
-    }
-    if (!cityOptions.length) {
-      return;
-    }
-    const normalizeCity = (value) =>
-      String(value || "")
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, " ");
+  // Pick the visitor's city once, when their shared location matches a city
+  // in the list.
+  const normalizeCity = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+  const [cityAutoSelected, setCityAutoSelected] = useState(false);
+  if (!cityAutoSelected && locationData?.city && cityOptions.length) {
     const detectedCity = normalizeCity(locationData.city);
     const matchedCity = cityOptions.find(
       (option) => normalizeCity(option) === detectedCity,
     );
     if (matchedCity) {
+      setCityAutoSelected(true);
       setCity(matchedCity);
-      locationAutoSelectedRef.current = true;
     }
-  }, [locationData?.city, cityOptions]);
+  }
 
-  useEffect(() => {
+  // A new city clears the micro-market choice and loads that city's list.
+  const [micromarketCity, setMicromarketCity] = useState(city);
+  if (micromarketCity !== city) {
+    setMicromarketCity(city);
     if (!city) {
       setMicromarkets([]);
       setSelectedMicromarkets([]);
       setMicromarketOpen(false);
       setMicromarketSearch("");
-      return;
+    } else {
+      setLoadingMicromarkets(true);
     }
-    setLoadingMicromarkets(true);
+  }
+
+  useEffect(() => {
+    if (!city) return;
+    let cancelled = false;
     fetch(`/api/micromarkets?city=${encodeURIComponent(city)}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.micromarkets) {
-          setMicromarkets(data.micromarkets);
-        } else {
-          setMicromarkets([]);
-        }
+        if (cancelled) return;
+        setMicromarkets(data.success && data.micromarkets ? data.micromarkets : []);
       })
       .catch(() => {
-        setMicromarkets([]);
+        if (!cancelled) setMicromarkets([]);
       })
       .finally(() => {
-        setLoadingMicromarkets(false);
+        if (!cancelled) setLoadingMicromarkets(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [city]);
 
   useEffect(() => {

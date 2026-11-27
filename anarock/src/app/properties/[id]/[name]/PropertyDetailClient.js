@@ -5,6 +5,7 @@ import { convertRentPerArea, formatArea, formatPrice } from "@/lib/format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import PropertyCard from "@/components/properties/PropertyCard";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import PropertyEnquiryForm from "@/components/properties/PropertyEnquiryForm";
@@ -204,6 +205,7 @@ export default function PropertyDetailClient({
   // loading the original file directly from Stratus.
   const [directImages, setDirectImages] = useState(() => new Set());
   const { unit, currency, exchangeRates } = usePreferences();
+  const router = useRouter();
   const [loading, setLoading] = useState(!initial.property);
   const [error, setError] = useState("");
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -437,11 +439,11 @@ export default function PropertyDetailClient({
         COMPARE_STORAGE_KEY,
         JSON.stringify(compareSelection),
       );
-      window.location.href = "/compare";
+      router.push("/compare");
     } catch (err) {
       console.error("Failed to open compare page:", err);
     }
-  }, [compareSelection]);
+  }, [compareSelection, router]);
 
   const availableGallery = useMemo(() => {
     return gallery.filter((image) => !failedImages.has(image.key));
@@ -460,20 +462,13 @@ export default function PropertyDetailClient({
     ? availableGallery.findIndex((image) => image.key === activeImageItem.key)
     : -1;
 
-  useEffect(() => {
-    if (!availableGallery.length) {
-      if (activeImg !== "") setActiveImg("");
-      return;
-    }
-
-    const activeExists = availableGallery.some(
-      (image) => image.key === activeImg,
-    );
-
-    if (!activeExists) {
-      setActiveImg(availableGallery[0].key);
-    }
-  }, [availableGallery, activeImg]);
+  // When the shown image fails to load, move to the first one that works.
+  const validActiveImg = availableGallery.some((image) => image.key === activeImg)
+    ? activeImg
+    : availableGallery[0]?.key || "";
+  if (validActiveImg !== activeImg) {
+    setActiveImg(validActiveImg);
+  }
 
   const handleImageError = useCallback((imageKey) => {
     if (!imageKey) return;

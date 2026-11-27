@@ -19,6 +19,8 @@ import { usePreferences } from "@/lib/preferences";
 import Breadcrumbs from "@/components/common/Breadcrumbs";
 import { useWishlist } from "@/lib/wishlist";
 import { fetchPropertiesByIds } from "@/lib/fetchPropertiesByIds";
+import { useCompareSelection } from "@/lib/compareSelection";
+import { useHydrated } from "@/lib/browserStore";
 
 const COMPARE_STORAGE_KEY = "anarock_compare_properties";
 const MAX_COMPARE_PROPERTIES = 3;
@@ -75,8 +77,8 @@ function DynamicPropertyImage({ folder, alt, priority, className }) {
 export default function ComparePage() {
   const { unit, currency, exchangeRates } = usePreferences();
   const { ids: wishlistIds, toggle: toggleWishlist } = useWishlist();
-  const [isMounted, setIsMounted] = useState(false);
-  const [properties, setProperties] = useState([]);
+  const isMounted = useHydrated();
+  const [properties, setProperties] = useCompareSelection({ keep: "last" });
   const [allProperties, setAllProperties] = useState([]);
   // The full list is only needed for the "add property" window, so it is
   // loaded the first time that window opens.
@@ -87,18 +89,6 @@ export default function ComparePage() {
   const [selectedMicromarkets, setSelectedMicromarkets] = useState([]);
   const [showThirdSlotSkeleton, setShowThirdSlotSkeleton] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-    try {
-      const stored = localStorage.getItem(COMPARE_STORAGE_KEY);
-      let parsed = stored ? JSON.parse(stored) : [];
-      if (Array.isArray(parsed)) {
-        setProperties(parsed.slice(-MAX_COMPARE_PROPERTIES));
-      }
-    } catch {
-      setProperties([]);
-    }
-  }, []);
 
   useEffect(() => {
     document.title =
@@ -214,22 +204,14 @@ export default function ComparePage() {
             if (id) propertyMap.set(id, property);
           });
 
-          setProperties((currentStored) => {
-            const hydratedProperties = currentStored
+          setProperties((currentStored) =>
+            currentStored
               .map((storedProperty) => {
                 const id = getId(storedProperty);
                 return propertyMap.get(id) || storedProperty;
               })
-              .filter(Boolean);
-
-            if (!cancelled && hydratedProperties.length > 0) {
-              localStorage.setItem(
-                COMPARE_STORAGE_KEY,
-                JSON.stringify(hydratedProperties),
-              );
-            }
-            return hydratedProperties;
-          });
+              .filter(Boolean),
+          );
         }
       } catch (error) {
         console.error("Unable to load comparison properties:", error);
@@ -241,13 +223,12 @@ export default function ComparePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setProperties]);
 
-  useEffect(() => {
-    if (properties.length < 2) {
-      setShowThirdSlotSkeleton(false);
-    }
-  }, [properties.length]);
+  // The empty third slot closes when fewer than two properties are left.
+  if (showThirdSlotSkeleton && properties.length < 2) {
+    setShowThirdSlotSkeleton(false);
+  }
 
   const getName = (property) => property?.name;
   const getPropertySlug = (property) => {
@@ -274,16 +255,6 @@ export default function ComparePage() {
     );
 
     setProperties(updatedProperties);
-
-    if (!updatedProperties.length) {
-      localStorage.removeItem(COMPARE_STORAGE_KEY);
-      return;
-    }
-
-    localStorage.setItem(
-      COMPARE_STORAGE_KEY,
-      JSON.stringify(updatedProperties),
-    );
   };
 
   const addPropertyToCompare = (property) => {
@@ -292,7 +263,6 @@ export default function ComparePage() {
     if (properties.some((p) => getId(p) === propertyId)) return;
     const updated = [...properties, property];
     setProperties(updated);
-    localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(updated));
     setIsModalOpen(false);
     setShowThirdSlotSkeleton(false);
   };

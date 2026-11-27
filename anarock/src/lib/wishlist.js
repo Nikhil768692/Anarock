@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
+import { useStorageValue, writeStorageValue } from "@/lib/browserStore";
 const WishlistContext = createContext(null);
 const STORAGE_KEY = "anarock_wishlist_properties";
 function getPropertyId(property) {
@@ -52,74 +46,44 @@ function hasPropertyData(property) {
   });
 }
 
-function readWishlist() {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
+function parseWishlist(raw) {
+  if (!raw) return [];
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-
-    if (!stored) {
-      return [];
-    }
-
-    const parsed = JSON.parse(stored);
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter(Boolean);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
   } catch (error) {
     console.error("Wishlist read error:", error);
     return [];
   }
 }
 
-function saveWishlist(items) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
+function readWishlist() {
+  if (typeof window === "undefined") return [];
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-
-    window.dispatchEvent(new Event("wishlist-updated"));
-  } catch (error) {
-    console.error("Wishlist save error:", error);
+    return parseWishlist(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return [];
   }
 }
 
+function saveWishlist(items) {
+  writeStorageValue(STORAGE_KEY, JSON.stringify(items), {
+    event: "wishlist-updated",
+  });
+}
+
 export function WishlistProvider({ children }) {
-  const [items, setItems] = useState([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-  useEffect(() => {
-    const savedItems = readWishlist();
+  // The shortlist lives in localStorage, so it is shared by every tab.
+  const raw = useStorageValue(STORAGE_KEY, { events: ["wishlist-updated"] });
+  const isInitialized = raw !== undefined;
+  const items = useMemo(() => parseWishlist(raw), [raw]);
 
-    setItems(savedItems);
-    setIsInitialized(true);
-  }, []);
-  useEffect(() => {
-    function handleWishlistUpdate() {
-      setItems(readWishlist());
-    }
-
-    function handleStorageUpdate(event) {
-      if (event.key === STORAGE_KEY) {
-        setItems(readWishlist());
-      }
-    }
-
-    window.addEventListener("wishlist-updated", handleWishlistUpdate);
-
-    window.addEventListener("storage", handleStorageUpdate);
-
-    return () => {
-      window.removeEventListener("wishlist-updated", handleWishlistUpdate);
-
-      window.removeEventListener("storage", handleStorageUpdate);
-    };
+  // Changes always start from the saved list, so two quick clicks never
+  // overwrite each other.
+  const setItems = useCallback((update) => {
+    const previous = readWishlist();
+    const next = typeof update === "function" ? update(previous) : update;
+    if (next !== previous) saveWishlist(next);
   }, []);
   const ids = useMemo(() => {
     return items.map(getPropertyId).filter(Boolean);
@@ -151,7 +115,6 @@ export function WishlistProvider({ children }) {
             ...property,
             id: property.id ?? existingProperty.id ?? propertyId,
           };
-          saveWishlist(updatedItems);
           return updatedItems;
         }
         return previousItems;
@@ -178,10 +141,9 @@ export function WishlistProvider({ children }) {
             };
 
       const updatedItems = [...previousItems, normalizedProperty];
-      saveWishlist(updatedItems);
       return updatedItems;
     });
-  }, []);
+  }, [setItems]);
   const remove = useCallback((propertyOrId) => {
     const propertyId = getPropertyId(propertyOrId);
     if (!propertyId) {
@@ -191,10 +153,9 @@ export function WishlistProvider({ children }) {
       const updatedItems = previousItems.filter(
         (item) => getPropertyId(item) !== propertyId,
       );
-      saveWishlist(updatedItems);
       return updatedItems;
     });
-  }, []);
+  }, [setItems]);
   const toggle = useCallback(
     (property) => {
       const propertyId = getPropertyId(property);
@@ -213,8 +174,7 @@ export function WishlistProvider({ children }) {
   );
   const clear = useCallback(() => {
     setItems([]);
-    saveWishlist([]);
-  }, []);
+  }, [setItems]);
   return (
     <WishlistContext.Provider
       value={{

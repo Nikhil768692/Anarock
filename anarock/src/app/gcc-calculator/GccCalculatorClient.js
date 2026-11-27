@@ -64,14 +64,14 @@ export default function GccCalculatorClient() {
   const hostRef = useRef(null);
   const { currency, unit, exchangeRates } = usePreferences();
   const preferencesRef = useRef(null);
-  preferencesRef.current = getCalculatorPreferences(
-    currency,
-    unit,
-    exchangeRates,
-  );
 
   // Follow the navbar currency and sq.ft / sq.m switch.
   useEffect(() => {
+    preferencesRef.current = getCalculatorPreferences(
+      currency,
+      unit,
+      exchangeRates,
+    );
     applyPreferences(preferencesRef.current);
   }, [currency, unit, exchangeRates]);
 

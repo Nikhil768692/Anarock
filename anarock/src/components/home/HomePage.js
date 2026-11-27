@@ -668,6 +668,26 @@ export default function HomePage() {
     return () => controller.abort();
   }, []);
 
+  function loadLocationData() {
+    try {
+      const savedLocation = sessionStorage.getItem("anarock_user_location");
+      if (!savedLocation) {
+        setLocationData({ street: "", city: "", province: "", postalCode: "", country: "" });
+        return;
+      }
+      const location = JSON.parse(savedLocation);
+      setLocationData({
+        street: location.area || "",
+        city: location.city || "",
+        province: location.state || "",
+        postalCode: location.pincode || "",
+        country: location.country || "",
+      });
+    } catch (error) {
+      console.error("Failed to load location:", error);
+      setLocationData({ street: "", city: "", province: "", postalCode: "", country: "" });
+    }
+  }
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -699,26 +719,7 @@ export default function HomePage() {
     };
   }, []);
 
-  function loadLocationData() {
-    try {
-      const savedLocation = sessionStorage.getItem("anarock_user_location");
-      if (!savedLocation) {
-        setLocationData({ street: "", city: "", province: "", postalCode: "", country: "" });
-        return;
-      }
-      const location = JSON.parse(savedLocation);
-      setLocationData({
-        street: location.area || "",
-        city: location.city || "",
-        province: location.state || "",
-        postalCode: location.pincode || "",
-        country: location.country || "",
-      });
-    } catch (error) {
-      console.error("Failed to load location:", error);
-      setLocationData({ street: "", city: "", province: "", postalCode: "", country: "" });
-    }
-  }
+
 
   return (
     <>

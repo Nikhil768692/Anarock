@@ -52,65 +52,51 @@ function formatArea(num, unit) {
   })} ${suffix}`;
 }
 function AnimatedNumber({ value, unit, startAnimation, delay = 0 }) {
-  const [animatedValue, setAnimatedValue] = useState(0);
-  const animationRef = useRef(null);
-  const timeoutRef = useRef(null);
+  const target = Number(value);
+  const valid = value !== null && value !== undefined && Number.isFinite(target);
+  // The number counts up once the section is on screen; before that (and
+  // with reduced motion) the final value is shown.
+  const [frame, setFrame] = useState({ target: null, current: 0 });
+
   useEffect(() => {
-    if (value === null || value === undefined || Number.isNaN(Number(value))) {
-      return;
-    }
-    const target = Number(value);
-    if (!Number.isFinite(target)) {
-      return;
-    }
-    if (!startAnimation) {
-      setAnimatedValue(target);
-      return;
-    }
+    if (!valid || !startAnimation) return undefined;
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    if (reducedMotion) {
-      setAnimatedValue(target);
-      return;
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-    }
-    setAnimatedValue(0);
     const duration = 1800;
+    let animationFrame = null;
     let startTime = null;
+
     const animate = (currentTime) => {
-      if (!startTime) {
-        startTime = currentTime;
-      }
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
+      if (startTime === null) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / duration, 1);
       const easedProgress = 1 - Math.pow(1 - progress, 4);
-      const currentValue = target * easedProgress;
-      setAnimatedValue(currentValue);
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      } else {
-        setAnimatedValue(target);
-      }
+      setFrame({ target, current: progress < 1 ? target * easedProgress : target });
+      if (progress < 1) animationFrame = requestAnimationFrame(animate);
     };
-    timeoutRef.current = setTimeout(() => {
-      animationRef.current = requestAnimationFrame(animate);
-    }, delay);
+
+    const timeout = setTimeout(() => {
+      if (reducedMotion) {
+        setFrame({ target, current: target });
+        return;
+      }
+      animationFrame = requestAnimationFrame(animate);
+    }, reducedMotion ? 0 : delay);
+
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      clearTimeout(timeout);
+      if (animationFrame) cancelAnimationFrame(animationFrame);
     };
-  }, [value, startAnimation, delay]);
-  return formatArea(animatedValue, unit);
+  }, [target, valid, startAnimation, delay]);
+
+  const shown = !valid
+    ? 0
+    : !startAnimation
+      ? target
+      : frame.target === target
+        ? frame.current
+        : 0;
+  return formatArea(shown, unit);
 }
 export default function MarketStats() {
   const { unit } = usePreferences();

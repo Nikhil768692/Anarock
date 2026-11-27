@@ -176,6 +176,20 @@ function buildIndexes(properties) {
   };
 }
 
+function storeProperties(properties) {
+  const built = buildIndexes(properties);
+  state.data = properties;
+  state.byId = built.byId;
+  state.indexes = built.indexes;
+  state.timestamp = Date.now();
+}
+
+// Tests only: fills the cache with already-mapped properties, so routes can be
+// tested without the Data Store.
+export function setPropertiesForTesting(properties) {
+  storeProperties(properties);
+}
+
 function startRefresh() {
   if (state.fetchPromise) {
     return state.fetchPromise;
@@ -183,11 +197,7 @@ function startRefresh() {
 
   state.fetchPromise = fetchAllFromCatalyst()
     .then((properties) => {
-      const built = buildIndexes(properties);
-      state.data = properties;
-      state.byId = built.byId;
-      state.indexes = built.indexes;
-      state.timestamp = Date.now();
+      storeProperties(properties);
       state.lastRefreshError = null;
       state.lastRefreshErrorAt = 0;
       state.nextRefreshAllowedAt = 0;

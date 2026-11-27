@@ -14,8 +14,12 @@ function mapSpecifier(specifier) {
 const loadContext = (url, context) =>
   url.startsWith(SRC) && url.endsWith(".js") ? { ...context, format: "module" } : context;
 
+// "server-only" exists only inside the Next.js build; in tests it is empty.
+const EMPTY_MODULE = { url: "data:text/javascript,export%20%7B%7D", shortCircuit: true };
+
 // Hooks for module.register() (async, older Node versions).
 export async function resolve(specifier, context, nextResolve) {
+  if (specifier === "server-only") return EMPTY_MODULE;
   return nextResolve(mapSpecifier(specifier), context);
 }
 
@@ -25,6 +29,7 @@ export async function load(url, context, nextLoad) {
 
 // Hooks for module.registerHooks() (synchronous, newer Node versions).
 export function resolveSync(specifier, context, nextResolve) {
+  if (specifier === "server-only") return EMPTY_MODULE;
   return nextResolve(mapSpecifier(specifier), context);
 }
 

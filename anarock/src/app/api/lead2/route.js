@@ -12,12 +12,8 @@ import {
   readJsonBody,
 } from "@/lib/requestGuard";
 import { checkFormSubmission } from "@/lib/formProtection";
-import {
-  addRepeatEnquiryNote,
-  findDuplicateLeadId,
-  isDuplicateError,
-  PUBLIC_SUCCESS_MESSAGE,
-} from "@/lib/repeatEnquiry";
+import { PUBLIC_SUCCESS_MESSAGE } from "@/lib/repeatEnquiry";
+import { createLead } from "@/lib/crmLeads";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,61 +24,6 @@ export const runtime = "nodejs";
 
 
 
-async function createLeadInCRM(tokenInfo, recordData) {
-  const url = `${tokenInfo.apiDomain}/crm/v8/Leads`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${tokenInfo.accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      data: [recordData],
-      trigger: ["workflow"],
-    }),
-    cache: "no-store",
-  });
-
-  const responseText = await response.text();
-  let data;
-  try {
-    data = responseText ? JSON.parse(responseText) : {};
-  } catch {
-    throw new Error("Zoho CRM returned an invalid response.");
-  }
-
-  if (response.status === 401) {
-    const error = new Error("Zoho access token expired.");
-    error.code = "ZOHO_ACCESS_TOKEN_EXPIRED";
-    throw error;
-  }
-
-  if (!response.ok) {
-    const zohoResult = data?.data?.[0];
-    const detailedMessage =
-      zohoResult?.message || data?.message || "Zoho CRM rejected the lead.";
-    const error = new Error(detailedMessage);
-    error.code = zohoResult?.code || data?.code || "ZOHO_CRM_ERROR";
-    error.zohoResponse = data;
-    error.httpStatus = response.status;
-    throw error;
-  }
-
-  const result = data?.data?.[0];
-  if (!result || result.status !== "success") {
-    const error = new Error(
-      result?.message || "Lead was not created in Zoho CRM.",
-    );
-    error.code = result?.code || "ZOHO_LEAD_CREATION_FAILED";
-    error.zohoResponse = data;
-    throw error;
-  }
-
-  return {
-    leadId: result?.details?.id || null,
-    zohoResponse: data,
-  };
-}
 // Lead fields that the visitor must not choose. They are always set here.
 const LEAD_SOURCE = "Listing Platform";
 const LEAD_STATUS = "Not Contacted";
@@ -314,22 +255,11 @@ export async function POST(request) {
         }
       });
 
-      let result;
-      try {
-        result = await createLeadInCRM(currentToken, recordData);
-      } catch (error) {
-        if (!isDuplicateError(error)) throw error;
-        // The visitor is anonymous: never change the existing Lead. The
-        // enquiry is added to it as a Note for the team to check.
-        await addRepeatEnquiryNote({
-          apiDomain: currentToken.apiDomain,
-          accessToken: currentToken.accessToken,
-          leadId: findDuplicateLeadId(error.zohoResponse),
-          recordData,
-          source: recordData.Sublead_Source,
-        });
-        result = { duplicate: true };
-      }
+      const result = await createLead({
+        tokenInfo: currentToken,
+        recordData,
+        workflows: true,
+      });
 
       return {
         ...result,

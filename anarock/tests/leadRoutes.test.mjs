@@ -68,3 +68,41 @@ for (const [name, handler] of [["/api/leads", leads], ["/api/lead2", lead2]]) {
     assert.equal(calls.length, 0);
   });
 }
+
+// ---- Property enquiries (/api/lead3) ----
+const { setPropertiesForTesting } = await import("@/lib/propertiesCache");
+const { mapProperty } = await import("@/lib/propertyMapper");
+const { POST: lead3 } = await import("@/app/api/lead3/route");
+
+setPropertiesForTesting([
+  mapProperty({ ROWID: "101", PropertyName: "Linked Tower", City: "Pune", crmID: "1164552000000000101" }),
+  mapProperty({ ROWID: "102", PropertyName: "Unlinked Tower", City: "Pune" }),
+]);
+
+test("/api/lead3: website IDs are turned into CRM property links on the server", async (t) => {
+  const calls = fakeCrm(t, { duplicate: false });
+  const body = form({ selectedProperties: [{ id: "101" }, { id: "102" }] });
+  const result = await (await lead3(request(body))).json();
+  assert.equal(result.success, true);
+
+  const leadCall = calls.find((call) => call.url.endsWith("/crm/v8/Leads"));
+  const lead = JSON.parse(leadCall.init.body).data[0];
+  assert.deepEqual(lead.Interested_Properties, [{ Property_Name: { id: "1164552000000000101" } }]);
+  assert.match(lead.Description, /Linked Tower/);
+  assert.match(lead.Description, /Unlinked Tower .*not linked to a CRM property/);
+});
+
+test("/api/lead3: unknown property IDs are refused without calling the CRM", async (t) => {
+  const calls = fakeCrm(t, { duplicate: false });
+  const response = await lead3(request(form({ selectedProperties: [{ id: "999" }] })));
+  assert.equal(response.status, 400);
+  assert.equal(calls.length, 0);
+});
+
+test("/api/lead3: a repeat enquiry becomes a Note", async (t) => {
+  const calls = fakeCrm(t, { duplicate: true });
+  const result = await (await lead3(request(form({ selectedProperties: [{ id: "101" }] })))).json();
+  assert.equal(result.success, true);
+  assert.ok(calls.some((call) => call.url.endsWith("/crm/v8/Notes")));
+  assert.ok(!calls.some((call) => call.init.method === "PUT"));
+});

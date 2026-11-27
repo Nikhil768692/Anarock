@@ -15,6 +15,8 @@ import EnquiryModal from "./EnquiryModal";
 import ExclusiveLeadModal from "./ExclusiveLeadModal";
 import { usePreferences } from "@/lib/preferences";
 import { useWishlist } from "@/lib/wishlist";
+import { useCompareSelection } from "@/lib/compareSelection";
+import { useMediaQuery } from "@/lib/browserStore";
 import {
   SECURITY_CHECK_MESSAGE,
   useFormGuard,
@@ -45,7 +47,6 @@ import { PHONE_COUNTRIES as EXCLUSIVE_PHONE_COUNTRIES } from "@/lib/phoneCountri
 import {
   MAX_COMPARE_PROPERTIES,
   MIN_COMPARE_PROPERTIES,
-  COMPARE_STORAGE_KEY,
   OFFICE_TYPES,
   SORT_CATEGORIES,
   PropertyCardSkeleton,
@@ -92,7 +93,7 @@ function PropertiesClientContent({ initialResults = null }) {
   const exclusiveCountryRef = useRef(null);
   const [isEnquiryOpen, setIsEnquiryOpen] = useState(false);
   const [enquirySelection, setEnquirySelection] = useState([]);
-  const [compareSelection, setCompareSelection] = useState([]);
+  const [compareSelection, setCompareSelection] = useCompareSelection();
   // Shown for a few seconds when a 4th property is ticked for comparison.
   const [compareLimitNotice, setCompareLimitNotice] = useState(false);
   const compareSelectionRef = useRef([]);
@@ -133,7 +134,10 @@ function PropertiesClientContent({ initialResults = null }) {
   const showSelectionBar = hasShortlistedProperties || hasComparedProperties;
   // Floating "Looking for something exclusive?" card. Starts open on tablets
   // and larger screens, and as a small button on phones.
-  const [exclusiveCardOpen, setExclusiveCardOpen] = useState(true);
+  // On phones the "exclusive properties" card starts minimised.
+  const isPhone = useMediaQuery("(max-width: 639px)");
+  const [exclusiveCardChoice, setExclusiveCardOpen] = useState(null);
+  const exclusiveCardOpen = exclusiveCardChoice ?? !isPhone;
   // Cards shown (faded) while the AI search asks which micro-market is meant.
   const aiResultsRef = useRef(new Map());
   const shownPropertiesRef = useRef(
@@ -183,11 +187,14 @@ function PropertiesClientContent({ initialResults = null }) {
     };
   }, [searchParams, currency, unit]);
 
-  useEffect(() => {
-    const prompt = searchParams.get("prompt") || "";
-    setAiPromptDraft(prompt);
-    setAppliedAiPrompt(prompt);
-  }, [searchParams]);
+  // The AI prompt boxes follow the prompt in the address.
+  const urlPrompt = searchParams.get("prompt") || "";
+  const [promptFromUrl, setPromptFromUrl] = useState("");
+  if (promptFromUrl !== urlPrompt) {
+    setPromptFromUrl(urlPrompt);
+    setAiPromptDraft(urlPrompt);
+    setAppliedAiPrompt(urlPrompt);
+  }
 
   const handleApplyAiSearch = () => {
     const prompt = aiPromptDraft.trim();
@@ -603,12 +610,6 @@ function PropertiesClientContent({ initialResults = null }) {
   }, [compareSelection]);
 
   useEffect(() => {
-    if (window.matchMedia("(max-width: 639px)").matches) {
-      setExclusiveCardOpen(false);
-    }
-  }, []);
-
-  useEffect(() => {
     if (!compareLimitNotice) return undefined;
     const timer = setTimeout(() => setCompareLimitNotice(false), 4000);
     return () => clearTimeout(timer);
@@ -635,22 +636,12 @@ function PropertiesClientContent({ initialResults = null }) {
         if (prev.length >= MAX_COMPARE_PROPERTIES) return prev;
         updated = [...prev, property];
       }
-      try {
-        localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error("Failed to save comparison properties:", e);
-      }
       return updated;
     });
-  }, []);
+  }, [setCompareSelection]);
 
   const clearCompareSelection = () => {
     setCompareSelection([]);
-    try {
-      localStorage.removeItem(COMPARE_STORAGE_KEY);
-    } catch (e) {
-      console.error("Failed to clear comparison properties:", e);
-    }
   };
 
   const openComparePage = () => {
@@ -658,15 +649,6 @@ function PropertiesClientContent({ initialResults = null }) {
       compareSelection.length < MIN_COMPARE_PROPERTIES ||
       compareSelection.length > MAX_COMPARE_PROPERTIES
     ) {
-      return;
-    }
-    try {
-      localStorage.setItem(
-        COMPARE_STORAGE_KEY,
-        JSON.stringify(compareSelection),
-      );
-    } catch (e) {
-      console.error("Failed to save comparison properties:", e);
       return;
     }
     router.push("/compare");
@@ -681,38 +663,28 @@ function PropertiesClientContent({ initialResults = null }) {
       .catch(() => setCities([]));
   }, []);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(COMPARE_STORAGE_KEY);
-      if (!saved) return;
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        const valid = parsed
-          .filter((p) => getPropertyId(p))
-          .slice(0, MAX_COMPARE_PROPERTIES);
-        setCompareSelection(valid);
-      }
-    } catch (e) {
-      console.error("Failed to load comparison properties:", e);
-    }
-  }, []);
 
-  const resolvedCity = useMemo(() => {
-    if (!filters.city) return "";
-    const match = cities.find(
-      (c) => toUrlValue(c) === filters.city.toLowerCase(),
-    );
-    return match || filters.city;
-  }, [filters.city, cities]);
+  const filterCity = filters.city;
+  const resolvedCity = filterCity
+    ? cities.find((c) => toUrlValue(c) === filterCity.toLowerCase()) ||
+      filterCity
+    : "";
 
-  useEffect(() => {
+  // A new city clears the old micro-market list and loads the new one.
+  const [micromarketsCity, setMicromarketsCity] = useState(resolvedCity);
+  if (micromarketsCity !== resolvedCity) {
+    setMicromarketsCity(resolvedCity);
     if (!resolvedCity) {
       setMicromarkets([]);
       setShowMicromarkets(false);
-      return;
+    } else {
+      setMicromarketsLoading(true);
     }
+  }
+
+  useEffect(() => {
+    if (!resolvedCity) return undefined;
     const controller = new AbortController();
-    setMicromarketsLoading(true);
     fetch(`/api/micromarkets?city=${encodeURIComponent(resolvedCity)}`, {
       signal: controller.signal,
     })
@@ -1435,22 +1407,28 @@ function PropertiesClientContent({ initialResults = null }) {
     isCoworking,
   ]);
 
-  useEffect(() => {
-    const isLastResultsPage =
-      currentPage >= Math.max(1, totalPagesFromApi);
-
-    if (
-      loading ||
-      !searchCompleted ||
-      aiClarification ||
-      (totalProperties > 0 && !isLastResultsPage)
-    ) {
+  // Suggestions are shown under the last page of results (or when there are
+  // none). Whenever they are not wanted, the old ones are cleared.
+  const suggestionsWanted = !(
+    loading ||
+    !searchCompleted ||
+    aiClarification ||
+    (totalProperties > 0 && currentPage < Math.max(1, totalPagesFromApi))
+  );
+  const [suggestionsWereWanted, setSuggestionsWereWanted] =
+    useState(suggestionsWanted);
+  if (suggestionsWereWanted !== suggestionsWanted) {
+    setSuggestionsWereWanted(suggestionsWanted);
+    if (!suggestionsWanted) {
       setSuggestedProperties([]);
       setSuggestionsPage(1);
       setSuggestionsHasMore(false);
       setSuggestionsLoading(false);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!suggestionsWanted) return undefined;
 
     const controller = new AbortController();
     let active = true;
@@ -1583,6 +1561,7 @@ function PropertiesClientContent({ initialResults = null }) {
       controller.abort();
     };
   }, [
+    suggestionsWanted,
     loading,
     searchCompleted,
     aiClarification,

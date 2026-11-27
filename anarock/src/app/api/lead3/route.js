@@ -12,10 +12,8 @@ import {
 import { createRateLimiter, readJsonBody } from "@/lib/requestGuard";
 import { checkFormSubmission } from "@/lib/formProtection";
 import { getPropertiesByIds } from "@/lib/propertiesCache";
-import {
-    addRepeatEnquiryNote,
-    PUBLIC_SUCCESS_MESSAGE,
-} from "@/lib/repeatEnquiry";
+import { PUBLIC_SUCCESS_MESSAGE } from "@/lib/repeatEnquiry";
+import { createLead } from "@/lib/crmLeads";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -114,134 +112,6 @@ function buildInterestedProperties(selectedProperties) {
     return rows;
 }
 
-async function createLeadInCRM(tokenInfo, recordData) {
-    const url = `${tokenInfo.apiDomain}/crm/v8/Leads`;
-    const response = await fetch(url, {
-        method: "POST",
-        headers: {
-            Authorization: `Zoho-oauthtoken ${tokenInfo.accessToken}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            data: [recordData],
-            trigger: [],
-        }),
-        cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    const responseText = await response.text();
-    let data = {};
-    try {
-        data = responseText ? JSON.parse(responseText) : {};
-    } catch {
-        const error = new Error("Zoho CRM returned an invalid response.");
-        error.code = "ZOHO_INVALID_RESPONSE";
-        error.httpStatus = 502;
-        throw error;
-    }
-
-    logger.info("[ZOHO CRM] HTTP STATUS:", response.status);
-    if (response.status === 401) {
-        const error = new Error("Zoho access token expired.");
-        error.code = "ZOHO_ACCESS_TOKEN_EXPIRED";
-        throw error;
-    }
-
-    const zohoResult = data?.data?.[0];
-    const zohoCode = String(zohoResult?.code || data?.code || "")
-        .trim()
-        .toUpperCase();
-    const zohoMessage = String(zohoResult?.message || data?.message || "").trim();
-    const isDuplicate =
-        zohoCode === "DUPLICATE_DATA" ||
-        zohoCode === "DUPLICATE" ||
-        zohoMessage.toLowerCase().includes("duplicate") ||
-        (Array.isArray(zohoResult?.details?.errors) &&
-            zohoResult.details.errors.some(
-                (item) =>
-                    String(item?.code || "")
-                        .trim()
-                        .toUpperCase() === "DUPLICATE_DATA",
-            ));
-
-    if (isDuplicate) {
-        logger.info("[ZOHO CRM] Duplicate Lead detected.");
-        const duplicateErrors = Array.isArray(zohoResult?.details?.errors)
-            ? zohoResult.details.errors
-            : [];
-        let existingLeadId = null;
-        for (const duplicateError of duplicateErrors) {
-            const code = String(duplicateError?.code || "")
-                .trim()
-                .toUpperCase();
-            if (code === "DUPLICATE_DATA") {
-                const duplicateRecordId = duplicateError?.details?.duplicate_record?.id;
-                if (duplicateRecordId) {
-                    existingLeadId = String(duplicateRecordId);
-                    break;
-                }
-            }
-        }
-        if (!existingLeadId) {
-            const details = zohoResult?.details || data?.details || {};
-            existingLeadId =
-                details?.duplicate_record?.id ||
-                details?.id ||
-                details?.record_id ||
-                details?.recordId ||
-                details?.module?.id ||
-                details?.module?.record_id ||
-                null;
-        }
-        if (!existingLeadId) {
-            const error = new Error(
-                "Duplicate Lead detected, but the existing Lead could not be identified.",
-            );
-            error.code = "DUPLICATE_LEAD_ID_NOT_FOUND";
-            error.httpStatus = 502;
-            error.zohoResponse = data;
-            throw error;
-        }
-        // The visitor is anonymous: never change the existing Lead. The
-        // enquiry is added to it as a Note for the team to check.
-        await addRepeatEnquiryNote({
-            apiDomain: tokenInfo.apiDomain,
-            accessToken: tokenInfo.accessToken,
-            leadId: existingLeadId,
-            recordData,
-            source: recordData.Sublead_Source,
-            timeoutMs: REQUEST_TIMEOUT_MS,
-        });
-        return { success: true, duplicate: true };
-    }
-
-    if (!response.ok) {
-        const error = new Error(zohoMessage || "Zoho CRM rejected the Lead.");
-        error.code = zohoCode || "ZOHO_CRM_ERROR";
-        error.zohoResponse = data;
-        error.httpStatus = response.status;
-        throw error;
-    }
-    const result = data?.data?.[0];
-    if (!result || result.status !== "success") {
-        const error = new Error(
-            result?.message || "Lead was not created in Zoho CRM.",
-        );
-        error.code = result?.code || "ZOHO_LEAD_CREATION_FAILED";
-        error.zohoResponse = data;
-        error.httpStatus = 502;
-        throw error;
-    }
-    const leadId = result?.details?.id || null;
-    logger.info("[ZOHO CRM] New Lead created successfully:", leadId);
-    return {
-        success: true,
-        duplicate: false,
-        priority: false,
-        leadId,
-        zohoResponse: data,
-    };
-}
 
 export async function POST(request) {
     const requestId = createRequestId();
@@ -353,12 +223,6 @@ export async function POST(request) {
             body?.Requirement_Details ||
             "",
         );
-
-        const rawRequirementDetails =
-            body?.requirementDetails ??
-            body?.Requirement_Details ??
-            body?.RequirementDetails ??
-            message;
         const location = body?.location || {};
 
         const street = normalizeText(
@@ -630,7 +494,12 @@ export async function POST(request) {
                 }
             });
 
-            const result = await createLeadInCRM(currentToken, recordData);
+            const result = await createLead({
+              tokenInfo: currentToken,
+              recordData,
+              workflows: false,
+              timeoutMs: REQUEST_TIMEOUT_MS,
+            });
             return {
                 ...result,
                 requirementCity,
