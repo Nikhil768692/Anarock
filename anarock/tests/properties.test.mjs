@@ -49,3 +49,8 @@ test("availability types and distances are tidied", () => {
   assert.equal(property.distanceFromMetro, "2.5 km");
   assert.equal(property.distanceFromAirport, "12 km");
 });
+
+test("the crmID column is read as text and never as a rounded number", () => {
+  assert.equal(mapProperty({ ROWID: "1", crmID: "1164552000000579310" }).crmID, "1164552000000579310");
+  assert.equal(mapProperty({ ROWID: "1", crmID: 1164552000000579310 }).crmID, "");
+});

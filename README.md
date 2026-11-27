@@ -52,7 +52,7 @@ AI-powered commercial real estate search platform for India. The project is a Ne
 
 | Table              | Used for                                                                                     |
 | ------------------ | -------------------------------------------------------------------------------------------- |
-| `Properties`       | All property listings. Only the fields listed in `PUBLIC_PROPERTY_FIELDS` (`src/lib/propertyMapper.js`) are sent to browsers. The CRM record ID of a property is read from `CRMPropertyId` (or the column named in `CATALYST_CRM_ID_COLUMN`) and used only on the server. |
+| `Properties`       | All property listings. Only the fields listed in `PUBLIC_PROPERTY_FIELDS` (`src/lib/propertyMapper.js`) are sent to browsers. The CRM record ID of a property is read from the `crmID` column (or the column named in `CATALYST_CRM_ID_COLUMN`) and used only on the server. |
 | `FAQ`              | Home page FAQs (`Question`, `Answer`)                                                        |
 | `CityAdvisors`     | City page advisor card (`CityName`, `AdvisorName`, `Designation`, `ExperienceYears`, `PhotoUrl`) |
 | `CityMarketStats`  | City page market stats                                                                       |

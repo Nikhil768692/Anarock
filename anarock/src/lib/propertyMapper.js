@@ -56,6 +56,7 @@ function distance(value) {
 // the browser. Set CATALYST_CRM_ID_COLUMN if the column has another name.
 const CRM_ID_COLUMNS = [
   process.env.CATALYST_CRM_ID_COLUMN,
+  "crmID",
   "CRMPropertyId",
   "CRMPropertyID",
   "CRM_Property_ID",
@@ -65,9 +66,13 @@ const CRM_ID_COLUMNS = [
   "ZohoPropertyID",
 ].filter(Boolean);
 
+// CRM IDs have 19 digits, more than a JavaScript number holds exactly, so
+// only text values (as the Data Store sends them) or exact numbers are used.
 function crmIdOf(row) {
   for (const column of CRM_ID_COLUMNS) {
-    const value = String(row?.[column] ?? "").trim();
+    const raw = row?.[column];
+    if (typeof raw === "number" && !Number.isSafeInteger(raw)) continue;
+    const value = String(raw ?? "").trim();
     if (/^\d+$/.test(value)) return value;
   }
   return "";
@@ -138,6 +143,7 @@ export function mapProperty(row) {
     NoOfSeatsOffered: num(row.NoOfSeatsOffered),
     centerSeatingCapacity: num(row.CenterSeatingCapacity),
     operator: clean(row.Operator),
+    operatorName: clean(row.OperatorName),
     offeredSpace: clean(row.OfferedSpace),
     configuration: clean(row.Configuration),
     sizePerWorkstation: clean(row.SizePerWorkstation),
@@ -181,6 +187,7 @@ export const PUBLIC_PROPERTY_FIELDS = [
   "ImageFolderPath",
   "developer",
   "operator",
+  "operatorName",
   "floor",
   "availability",
   "buildingStructure",

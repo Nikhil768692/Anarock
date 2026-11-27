@@ -566,7 +566,7 @@ export default function PropertyDetailClient({
     return {
       isCoworking: isCoworkingProperty(property),
       propertyType: getValue(property, ["officeType"], "Conventional"),
-      managedBy: getValue(property, ["operator"]),
+      managedBy: getValue(property, ["operatorName", "operator"]),
       offeredSeats: getValue(property, ["NoOfSeatsOffered"]),
       seatPrice: getValue(property, ["monthlyCostPerSeat"]),
       quotedRent: getValue(property, ["quotedRent"]),
