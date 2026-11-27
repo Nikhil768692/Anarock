@@ -11,7 +11,6 @@ import {
   Loader2,
   Search,
   Check,
-  MapPin,
   Heart,
   ChevronRight,
 } from "lucide-react";
@@ -19,6 +18,7 @@ import {
 import { useWishlist } from "@/lib/wishlist";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import LocationControl from "@/components/common/LocationControl";
 
 const CURRENCY_CONFIG = {
   INR: { symbol: "₹", rate: 1, label: "₹  INR" },
@@ -163,7 +163,6 @@ const ALL_SERVICES_URL = "/services";
 
 export default function Navbar() {
   const { count: wishlistCount } = useWishlist();
-  const [isPriorityLead, setIsPriorityLead] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const { currency: currencyCode, unit } = usePreferences();
@@ -191,7 +190,6 @@ export default function Navbar() {
   const phoneInputRef = useRef(null);
   const servicesMenuRef = useRef(null);
 
-  const [userLocation, setUserLocation] = useState(null);
   const [manualCity, setManualCity] = useState("");
   const thankYouTimerRef = useRef(null);
 
@@ -232,37 +230,6 @@ export default function Navbar() {
     window.location.href = "/services";
   };
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const readUserLocation = () => {
-      try {
-        const savedLocation = sessionStorage.getItem("anarock_user_location");
-        if (!savedLocation) {
-          setUserLocation(null);
-          return;
-        }
-        const parsedLocation = JSON.parse(savedLocation);
-        setUserLocation(
-          parsedLocation && typeof parsedLocation === "object"
-            ? parsedLocation
-            : null,
-        );
-      } catch (error) {
-        console.warn("Unable to read saved user location:", error);
-        setUserLocation(null);
-      }
-    };
-
-    readUserLocation();
-    window.addEventListener("anarock-location-updated", readUserLocation);
-    window.addEventListener("storage", readUserLocation);
-
-    return () => {
-      window.removeEventListener("anarock-location-updated", readUserLocation);
-      window.removeEventListener("storage", readUserLocation);
-    };
-  }, []);
 
   const closeMenu = () => {
     setMobileOpen(false);
@@ -279,7 +246,6 @@ export default function Navbar() {
     setEnquiryStep(1);
     setPendingLeadPayload(null);
     setEnquiryStatus("form");
-    setIsPriorityLead(false);
     setEnquiryOpen(true);
   };
 
@@ -290,7 +256,6 @@ export default function Navbar() {
     }
 
     setEmail("");
-    setIsPriorityLead(false);
     setEmailError("");
     setEnquiryOpen(false);
     setEnquiryStatus("form");
@@ -565,7 +530,6 @@ export default function Navbar() {
     setIsSubmitting(true);
     setSubmitError("");
     setEmailError("");
-    setIsPriorityLead(false);
 
     const finalPayload = {
       ...pendingLeadPayload,
@@ -587,7 +551,6 @@ export default function Navbar() {
           result?.message || "Unable to create/update lead in CRM.",
         );
       }
-      setIsPriorityLead(Boolean(result?.priority));
       setEnquiryStatus("success");
       thankYouTimerRef.current = setTimeout(() => {
         closeEnquiry();
@@ -758,37 +721,22 @@ export default function Navbar() {
       <header className="sticky inset-x-0 top-0 z-[100] w-full translate-y-0 opacity-100">
         <div className="relative mx-auto w-full overflow-visible border shadow-lg border-white/40 bg-transparent backdrop-blur-2xl">
           <div className="flex h-[70px] min-h-[70px] w-full items-center justify-between gap-2 px-3 sm:h-[70px] sm:px-4 md:gap-3 md:px-5 lg:h-[85px] lg:px-3 lg:max-[1279px]:gap-1.5 min-[1280px]:h-[80px] min-[1280px]:gap-2 min-[1280px]:px-3 min-[1920px]:h-[80px] min-[1920px]:px-8">
-            <Link
-              href="/"
-              onClick={closeMenu}
-              aria-label="Anarock Commercial Listing Platform"
-              className="group flex min-w-0 shrink-0 items-center transition-transform duration-200 active:scale-95"
-            >
-              <div className="flex min-w-0 items-center gap-2 sm:gap-3 md:gap-3.5 min-[1920px]:gap-5">
+            <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3 md:gap-3.5 min-[1920px]:gap-5">
+              <Link
+                href="/"
+                onClick={closeMenu}
+                aria-label="Anarock Commercial Listing Platform"
+                className="group flex shrink-0 items-center transition-transform duration-200 active:scale-95"
+              >
                 <img
                   src="/Anarock.svg"
                   alt="Anarock"
                   className="block h-auto w-[90px] object-contain transition-transform duration-300 group-hover:scale-105 sm:w-[102px] md:w-[112px] lg:w-[120px] lg:max-[1279px]:w-[100px] min-[1280px]:w-[122px] min-[1920px]:w-[150px]"
                 />
-                <div className="flex min-w-0 max-w-[180px] items-center gap-1.5 bg-white/90 rounded-lg border border-black/15 px-2.5 py-1.5 shadow-sm backdrop-blur-sm transition-all duration-200 sm:max-w-[165px] sm:gap-2 sm:px-3 sm:py-2 md:max-w-[185px] lg:max-w-[250px] lg:max-[1279px]:max-w-[150px] lg:max-[1279px]:px-2 min-[1280px]:max-w-[175px] min-[1536px]:max-w-[250px] min-[1920px]:max-w-[260px] min-[1920px]:px-3.5 min-[1920px]:py-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#A054A0] text-white shadow-sm sm:h-7 sm:w-7 min-[1920px]:h-8 min-[1920px]:w-8">
-                    <MapPin size={14} strokeWidth={2.3} />
-                  </span>
-
-                  <span className="min-w-0 leading-tight">
-                    <span className="hidden text-[10px] font-bold uppercase tracking-wider text-[#A054A0] sm:block">
-                      Your location
-                    </span>
-
-                    <span className="block truncate text-[10px] font-semibold text-black sm:text-[13px] md:text-[14px] lg:max-[1279px]:text-[12px] min-[1280px]:text-[13px] min-[1920px]:text-[14px]">
-                      {userLocation?.city
-                        ? `${userLocation.city}${userLocation?.state ? `, ${userLocation.state}` : ""}`
-                        : userLocation?.state || "Select location"}
-                    </span>
-                  </span>
-                </div>
-              </div>
-            </Link>
+              </Link>
+              {/* Location is asked for only when the visitor uses this button. */}
+              <LocationControl />
+            </div>
 
             {/* Desktop Navigation */}
             <nav className="no-scrollbar mx-0 hidden min-w-0 items-center justify-center gap-1 overflow-visible rounded-lg border border-white/80 bg-white/90 px-4 py-1.5 shadow-sm backdrop-blur-md lg:flex lg:max-[1279px]:gap-0 lg:max-[1279px]:px-1 min-[1280px]:gap-0.5 min-[1280px]:px-2 min-[1366px]:gap-1 min-[1366px]:px-4 min-[1920px]:gap-2 min-[1920px]:p-2">
@@ -1273,15 +1221,11 @@ export default function Navbar() {
                 </p>
 
                 <h2 className="max-w-[440px] text-[24px] font-bold tracking-[-0.02em] text-black sm:text-[27px] lg:text-[30px] 2xl:text-[32px]">
-                  {isPriorityLead
-                    ? "Your enquiry has been received and put on priority"
-                    : "Your enquiry has been received"}
+                  Your enquiry has been received
                 </h2>
 
                 <p className="mt-3 text-[14px] leading-6 text-black/70 sm:text-[15px] 2xl:text-[16px]">
-                  {isPriorityLead
-                    ? "We have updated your information and placed your enquiry on priority. Our team will get back to you shortly."
-                    : "Our team will get back to you shortly."}
+                  Our team will get back to you shortly.
                 </p>
 
                 <p className="mt-7 rounded-lg border border-[#A054A0]/20 bg-white/80 px-4 py-2 text-[12px] font-medium text-[#A054A0] shadow-sm backdrop-blur-md sm:text-[13px] 2xl:text-[14px]">
@@ -1305,6 +1249,7 @@ export default function Navbar() {
 
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
                   <form
+                    key="enquiry-step-1"
                     onSubmit={handleFormOneSubmit}
                     className="px-4 py-4 sm:px-8 sm:py-6 2xl:px-8 2xl:py-7"
                   >
@@ -1584,6 +1529,7 @@ export default function Navbar() {
 
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
                   <form
+                    key="enquiry-step-2"
                     onSubmit={handleFormTwoSubmit}
                     className="px-4 py-4 sm:px-8 sm:py-6 2xl:px-8 2xl:py-7"
                   >

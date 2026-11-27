@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getClientIp } from "@/lib/requestGuard";
+import {
+    addRepeatEnquiryNote,
+    PUBLIC_SUCCESS_MESSAGE,
+} from "@/lib/repeatEnquiry";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -573,93 +577,21 @@ async function createLeadInCRM(tokenInfo, recordData) {
                 "Duplicate Lead detected, but the existing Lead could not be identified.",
             );
             error.code = "DUPLICATE_LEAD_ID_NOT_FOUND";
-            error.httpStatus = 409;
+            error.httpStatus = 502;
             error.zohoResponse = data;
             throw error;
         }
-        const updateData = {};
-        Object.entries(recordData || {}).forEach(([key, value]) => {
-            if (value === undefined || value === null || value === "") {
-                return;
-            }
-            updateData[key] = value;
-        });
-        delete updateData.id;
-        const updateUrl = `${tokenInfo.apiDomain}/crm/v8/Leads/${encodeURIComponent(
-            existingLeadId,
-        )}`;
-        console.log("[ZOHO CRM] Updating duplicate Lead:", existingLeadId);
-        const updateResponse = await fetch(updateUrl, {
-            method: "PUT",
-            headers: {
-                Authorization: `Zoho-oauthtoken ${tokenInfo.accessToken}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                data: [updateData],
-                trigger: [],
-            }),
-            cache: "no-store",
-            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        });
-        const updateResponseText = await updateResponse.text();
-        let updateResponseData = {};
-        try {
-            updateResponseData = updateResponseText
-                ? JSON.parse(updateResponseText)
-                : {};
-        } catch {
-            const error = new Error(
-                "Zoho returned an invalid response while updating the existing Lead.",
-            );
-            error.code = "ZOHO_INVALID_RESPONSE";
-            error.httpStatus = 502;
-            throw error;
-        }
-        console.log(
-            "[ZOHO CRM] Duplicate update HTTP status:",
-            updateResponse.status,
-        );
-        if (updateResponse.status === 401) {
-            const error = new Error(
-                "Zoho access token expired while updating duplicate Lead.",
-            );
-            error.code = "ZOHO_ACCESS_TOKEN_EXPIRED";
-            throw error;
-        }
-
-        if (!updateResponse.ok) {
-            const updateResult = updateResponseData?.data?.[0];
-            const error = new Error(
-                updateResult?.message ||
-                updateResponseData?.message ||
-                "Unable to update the existing Lead.",
-            );
-            error.code =
-                updateResult?.code ||
-                updateResponseData?.code ||
-                "ZOHO_DUPLICATE_UPDATE_FAILED";
-            error.zohoResponse = updateResponseData;
-            error.httpStatus = updateResponse.status;
-            throw error;
-        }
-        const updatedResult = updateResponseData?.data?.[0];
-        if (!updatedResult || updatedResult.status !== "success") {
-            const error = new Error(
-                updatedResult?.message || "Existing Lead could not be updated.",
-            );
-            error.code = updatedResult?.code || "ZOHO_DUPLICATE_UPDATE_FAILED";
-            error.zohoResponse = updateResponseData;
-            error.httpStatus = 502;
-            throw error;
-        }
-        return {
-            success: true,
-            duplicate: true,
-            priority: true,
+        // The visitor is anonymous: never change the existing Lead. The
+        // enquiry is added to it as a Note for the team to check.
+        await addRepeatEnquiryNote({
+            apiDomain: tokenInfo.apiDomain,
+            accessToken: tokenInfo.accessToken,
             leadId: existingLeadId,
-            zohoResponse: updateResponseData,
-        };
+            recordData,
+            source: recordData.Sublead_Source,
+            timeoutMs: REQUEST_TIMEOUT_MS,
+        });
+        return { success: true, duplicate: true };
     }
 
     if (!response.ok) {
@@ -1096,24 +1028,14 @@ export async function POST(request) {
         };
 
         try {
-            const result = await processLead(tokenInfo);
+            // The same reply for new and repeat enquiries: it must not
+            // reveal whether this person is already in the CRM.
+            await processLead(tokenInfo);
 
             return NextResponse.json(
                 {
                     success: true,
-                    duplicate: Boolean(result?.duplicate),
-                    priority: Boolean(result?.priority),
-                    message: result?.duplicate
-                        ? "Your enquiry has been received and the existing Lead has been updated."
-                        : "Lead created successfully.",
-                    leadId: result.leadId,
-                    requirementCity: result?.requirementCity || "",
-                    requirementCityId: result?.requirementCityId || null,
-                    requirementCityFound: Boolean(result?.requirementCityId),
-                    requirementType: result?.requirementType || "",
-                    currentLocation: result?.currentLocation || null,
-                    leadOwnerTeam: result?.leadOwnerTeam || null,
-                    interestedPropertiesCount: result?.interestedPropertiesCount || 0,
+                    message: PUBLIC_SUCCESS_MESSAGE,
                     requestId,
                 },
                 {
@@ -1124,23 +1046,11 @@ export async function POST(request) {
             if (error?.code === "ZOHO_ACCESS_TOKEN_EXPIRED") {
                 console.warn("[ZOHO AUTH] Access token expired. Refreshing once...");
                 tokenInfo = await getZohoAccessToken(true);
-                const result = await processLead(tokenInfo);
+                await processLead(tokenInfo);
                 return NextResponse.json(
                     {
                         success: true,
-                        duplicate: Boolean(result?.duplicate),
-                        priority: Boolean(result?.priority),
-                        message: result?.duplicate
-                            ? "Your enquiry has been received and the existing Lead has been updated."
-                            : "Lead created successfully.",
-                        leadId: result.leadId,
-                        requirementCity: result?.requirementCity || "",
-                        requirementCityId: result?.requirementCityId || null,
-                        requirementCityFound: Boolean(result?.requirementCityId),
-                        requirementType: result?.requirementType || "",
-                        currentLocation: result?.currentLocation || null,
-                        leadOwnerTeam: result?.leadOwnerTeam || null,
-                        interestedPropertiesCount: result?.interestedPropertiesCount || 0,
+                        message: PUBLIC_SUCCESS_MESSAGE,
                         requestId,
                     },
                     {

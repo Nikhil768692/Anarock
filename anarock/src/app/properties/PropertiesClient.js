@@ -723,7 +723,7 @@ function PropertiesClientContent() {
 
       const data = await response.json().catch(() => ({}));
 
-      if (!response.ok || data?.success !== true || !data?.leadId) {
+      if (!response.ok || data?.success !== true) {
         throw new Error(
           data?.message ||
           data?.error ||
@@ -883,7 +883,7 @@ function PropertiesClientContent() {
 
       const data = await response.json().catch(() => ({}));
 
-      if (!response.ok || data?.success !== true || !data?.leadId) {
+      if (!response.ok || data?.success !== true) {
         throw new Error(
           data?.message ||
           data?.error ||

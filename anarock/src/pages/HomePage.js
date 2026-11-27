@@ -519,7 +519,6 @@ export default function HomePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const countrySearchRef = useRef(null);
   const [requirementCity, setRequirementCity] = useState("");
-  const [consentGranted, setConsentGranted] = useState(false);
   const [requirementType, setRequirementType] = useState("");
   const [requirementCityOptions, setRequirementCityOptions] = useState([]);
   const [locationData, setLocationData] = useState({
@@ -660,9 +659,7 @@ export default function HomePage() {
         setLocationData({ street: "", city: "", province: "", postalCode: "", country: "" });
       } else {
         setSubmitMessage(
-          result.errorCode === "DUPLICATE_DATA"
-            ? "We already have your details on file. Our team will be in touch shortly."
-            : result.message || "We couldn't submit your requirement right now. Please try again.",
+          result.message || "We couldn't submit your requirement right now. Please try again.",
         );
         setSubmitMessageType("error");
       }
@@ -674,73 +671,6 @@ export default function HomePage() {
       setIsSubmitting(false);
     }
   };
-
-  const locationRequestStartedRef = useRef(false);
-  const requestLocationPermission = useCallback(() => {
-    if (locationRequestStartedRef.current) return;
-    locationRequestStartedRef.current = true;
-    try {
-      const savedLocation = sessionStorage.getItem("anarock_user_location");
-      if (savedLocation) {
-        const location = JSON.parse(savedLocation);
-        setLocationData({
-          street: location.area || "",
-          city: location.city || "",
-          province: location.state || "",
-          postalCode: location.pincode || "",
-          country: location.country || "",
-        });
-        window.dispatchEvent(new Event("anarock-location-updated"));
-        return;
-      }
-    } catch (error) {
-      console.warn("Failed to read saved location:", error);
-      sessionStorage.removeItem("anarock_user_location");
-    }
-
-    if (!navigator.geolocation) return;
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const response = await fetch("/api/location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ latitude, longitude }),
-          });
-          const data = await response.json();
-          if (!response.ok || !data?.success || !data?.location) return;
-
-          const location = {
-            latitude,
-            longitude,
-            city: data.location.city || "",
-            area: data.location.area || "",
-            pincode: data.location.pincode || "",
-            state: data.location.state || "",
-            country: data.location.country || "",
-            displayName: data.location.displayName || "",
-          };
-          sessionStorage.setItem("anarock_user_location", JSON.stringify(location));
-          setLocationData({
-            street: location.area || "",
-            city: location.city || "",
-            province: location.state || "",
-            postalCode: location.pincode || "",
-            country: location.country || "",
-          });
-          window.dispatchEvent(new Event("anarock-location-updated"));
-        } catch (error) {
-          console.warn("Location capture unavailable:", error?.message || error);
-        }
-      },
-      (error) => {
-        console.warn("Browser location unavailable:", error?.message || error);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 },
-    );
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1251,12 +1181,7 @@ export default function HomePage() {
         */}
       </div>
 
-      <CookieConsent
-        onConsentGiven={() => {
-          setConsentGranted(true);
-          requestLocationPermission();
-        }}
-      />
+      <CookieConsent />
     </>
   );
 }

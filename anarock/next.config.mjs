@@ -61,6 +61,9 @@ const nextConfig = {
         ];
     },
     images: {
+        // Next.js 16 allows only listed image qualities (default: 75 only).
+        // The property detail gallery uses 90.
+        qualities: [75, 90],
         remotePatterns: [
             {
                 protocol: "https",

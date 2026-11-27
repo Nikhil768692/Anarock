@@ -3,6 +3,12 @@ import {
   createRateLimiter,
   readJsonBody,
 } from "@/lib/requestGuard";
+import {
+  addRepeatEnquiryNote,
+  findDuplicateLeadId,
+  isDuplicateError,
+  PUBLIC_SUCCESS_MESSAGE,
+} from "@/lib/repeatEnquiry";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const ACCOUNTS_URL = "https://accounts.zoho.in";
@@ -511,7 +517,22 @@ export async function POST(request) {
         }
       });
 
-      const result = await createLeadInCRM(currentToken, recordData);
+      let result;
+      try {
+        result = await createLeadInCRM(currentToken, recordData);
+      } catch (error) {
+        if (!isDuplicateError(error)) throw error;
+        // The visitor is anonymous: never change the existing Lead. The
+        // enquiry is added to it as a Note for the team to check.
+        await addRepeatEnquiryNote({
+          apiDomain: currentToken.apiDomain,
+          accessToken: currentToken.accessToken,
+          leadId: findDuplicateLeadId(error.zohoResponse),
+          recordData,
+          source: recordData.Sublead_Source,
+        });
+        result = { duplicate: true };
+      }
 
       return {
         ...result,
@@ -527,7 +548,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: true,
-          message: "Lead created successfully.",
+          message: PUBLIC_SUCCESS_MESSAGE,
         },
         {
           status: 200,
@@ -540,7 +561,7 @@ export async function POST(request) {
         return NextResponse.json(
           {
             success: true,
-            message: "Lead created successfully.",
+            message: PUBLIC_SUCCESS_MESSAGE,
           },
           {
             status: 200,
@@ -554,26 +575,6 @@ export async function POST(request) {
       "[LEAD2] Lead creation failed:",
       error?.code || "UNKNOWN_ERROR",
     );
-
-    const isDuplicate =
-      error?.code === "DUPLICATE_DATA" ||
-      error?.zohoResponse?.data?.some(
-        (item) => item?.code === "DUPLICATE_DATA",
-      );
-
-    if (isDuplicate) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "We already have your details on file. Our team will be in touch shortly.",
-          errorCode: "DUPLICATE_DATA",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
 
     return NextResponse.json(
       {

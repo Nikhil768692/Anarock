@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Cookie, ArrowUpRight } from "lucide-react";
+import { clearStoredLocation } from "@/lib/userLocation";
 export default function CookieConsent({ onConsentGiven }) {
   const [show, setShow] = useState(false);
   const [view, setView] = useState("overview");
@@ -23,6 +24,8 @@ export default function CookieConsent({ onConsentGiven }) {
     const finalPrefs = customPrefs || preferences;
     localStorage.setItem("cookie_consent_accepted", "true");
     localStorage.setItem("cookie_preferences", JSON.stringify(finalPrefs));
+    // Rejecting optional storage also removes a saved location.
+    if (!finalPrefs.preferences) clearStoredLocation();
     setShow(false);
     if (onConsentGiven) onConsentGiven();
   };
@@ -70,8 +73,8 @@ export default function CookieConsent({ onConsentGiven }) {
             </p>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-700 sm:mt-3 sm:text-sm sm:leading-6 lg:text-[15px] lg:leading-6">
               Cookies help us remember your shortlisted and compared properties,
-              location, search history, and preferences to deliver a seamless,
-              personalised experience.
+              search history, and preferences. Your location is used only if you
+              choose to share it using the location button at the top of the page.
             </p>
           </div>
           <div className="w-full lg:w-[300px] flex flex-col gap-2 sm:gap-2.5 shrink-0">
